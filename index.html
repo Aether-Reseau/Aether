@@ -78,7 +78,13 @@ const el = (tag,props={},ch=[]) => {
     else if(k==='html') e.innerHTML=v;
     else e[k]=v;
   }
-  for(const c of ch){ if(c==null||c===false)continue; e.appendChild(typeof c==='string'?document.createTextNode(c):c); }
+  // ch can be array, string, or single node
+  const children = Array.isArray(ch)?ch:(ch!=null?[ch]:[]);
+  for(const c of children){
+    if(c==null||c===false)continue;
+    if(typeof c==='string'||typeof c==='number') e.appendChild(document.createTextNode(String(c)));
+    else if(c instanceof Node) e.appendChild(c);
+  }
   return e;
 };
 const div  = (s,ch)  => el('div',{style:s||{}},ch||[]);
