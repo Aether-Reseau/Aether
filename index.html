@@ -238,14 +238,15 @@ function renderAuth(){
     card.appendChild(Field('Mot de passe','password',f.password,v=>setF('password',v),err.password,'••••••••'));
 
     const loginBtn=btn({...S.BTN,opacity:loading?0.6:1},'Se connecter',async()=>{
-      if(loading)return;
+      if(STATE.authLoading)return;
+      const af=STATE.authForm;
       const e={};
-      if(!f.email.trim()) e.email='Requis';
-      if(!f.password)     e.password='Requis';
+      if(!af.email.trim()) e.email='Requis';
+      if(!af.password)     e.password='Requis';
       if(Object.keys(e).length){setState({authErrors:e});return;}
       setState({authLoading:true,authErrors:{}});
       try{
-        await signInWithEmailAndPassword(auth,f.email.trim(),f.password);
+        await signInWithEmailAndPassword(auth,af.email.trim(),af.password);
       }catch(ex){
         let msg='Erreur de connexion';
         if(ex.code==='auth/user-not-found'||ex.code==='auth/wrong-password'||ex.code==='auth/invalid-credential') msg='Email ou mot de passe incorrect';
@@ -275,13 +276,14 @@ function renderAuth(){
       card.appendChild(Field('Mot de passe','password',f.password,v=>setF('password',v),err.password,'••••••••'));
       card.appendChild(Field('Confirmer','password',f.confirm,v=>setF('confirm',v),err.confirm,'••••••••'));
       card.appendChild(btn({...S.BTN},'Continuer →',()=>{
+        const af=STATE.authForm;
         const e={};
-        if(!f.name.trim())      e.name='Requis';
-        if(!f.email.trim())     e.email='Requis';
-        else if(!/\S+@\S+\.\S+/.test(f.email)) e.email='Email invalide';
-        if(!f.password)         e.password='Requis';
-        else if(f.password.length<6) e.password='6 caractères minimum';
-        if(f.password!==f.confirm)   e.confirm='Ne correspond pas';
+        if(!af.name.trim())      e.name='Requis';
+        if(!af.email.trim())     e.email='Requis';
+        else if(!/\S+@\S+\.\S+/.test(af.email)) e.email='Email invalide';
+        if(!af.password)         e.password='Requis';
+        else if(af.password.length<6) e.password='6 caractères minimum';
+        if(af.password!==af.confirm)   e.confirm='Ne correspond pas';
         if(Object.keys(e).length){setState({authErrors:e});return;}
         setState({authErrors:{},authStep:2});
       }));
@@ -296,9 +298,10 @@ function renderAuth(){
       card.appendChild(bioW);
 
       const regBtn=btn({...S.BTN,opacity:loading?0.6:1},'Rejoindre Æther',async()=>{
-        if(loading)return;
+        if(STATE.authLoading)return;
+        const af=STATE.authForm;
         const e={};
-        const handle=(f.handle||'').trim().toLowerCase();
+        const handle=(af.handle||'').trim().toLowerCase();
         if(!handle)           e.handle='Requis';
         else if(!/^[a-z0-9_]{3,20}$/.test(handle)) e.handle='3-20 car. : lettres minuscules, chiffres, _';
         if(Object.keys(e).length){setState({authErrors:e});return;}
@@ -306,16 +309,16 @@ function renderAuth(){
         setState({authLoading:true,authErrors:{}});
         try{
           // Step 1: create Firebase Auth account first
-          const cred=await createUserWithEmailAndPassword(auth,f.email.trim(),f.password);
-          await updateProfile(cred.user,{displayName:f.name.trim()});
+          const cred=await createUserWithEmailAndPassword(auth,af.email.trim(),af.password);
+          await updateProfile(cred.user,{displayName:af.name.trim()});
           // Step 2: wait for auth token to be fully ready
           await cred.user.getIdToken(true);
           // Step 3: save profile in Firestore (now authenticated)
           const profileData = {
-            displayName: f.name.trim(),
+            displayName: af.name.trim(),
             handle:      handle,
-            bio:         f.bio.trim()||'Nouveau sur Æther',
-            email:       f.email.trim(),
+            bio:         af.bio.trim()||'Nouveau sur Æther',
+            email:       af.email.trim(),
             followers:   0,
             following:   0,
             followingIds:[],
