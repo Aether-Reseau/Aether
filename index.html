@@ -725,8 +725,16 @@ function renderEditProfile(){
   tb.appendChild(btn({...S.BTN,width:'auto',padding:'6px 16px',marginTop:'0'},'Enregistrer',async()=>{
     if(saving)return;saving=true;
     try{
-      const upd={displayName:ef.displayName.trim()||me.displayName,bio:ef.bio.trim(),location:ef.location.trim(),website:ef.website.trim(),avatarColor:ef.avatarColor};
-      if(ef.avatarFile){
+      // Always read latest values from STATE.editForm
+      const sf=STATE.editForm;
+      const upd={
+        displayName: (sf.displayName||'').trim()||me.displayName,
+        bio:         (sf.bio||'').trim(),
+        location:    (sf.location||'').trim(),
+        website:     (sf.website||'').trim(),
+        avatarColor: sf.avatarColor||me.avatarColor||AV_COLORS[0]
+      };
+      if(sf.avatarFile){
         // Convert avatar to base64
         upd.photoURL=await new Promise((res,rej)=>{
           const img=new Image();
@@ -739,16 +747,16 @@ function renderEditProfile(){
             res(canvas.toDataURL('image/jpeg',0.8));
           };
           img.onerror=rej;
-          img.src=URL.createObjectURL(ef.avatarFile);
+          img.src=URL.createObjectURL(sf.avatarFile);
         });
       }
       await updateDoc(doc(db,'users',STATE.currentUser.uid),upd);
       await updateProfile(STATE.currentUser,{displayName:upd.displayName,...(upd.photoURL?{photoURL:upd.photoURL}:{})});
-      STATE.userProfile={...me,...upd};
+      STATE.userProfile={...STATE.userProfile,...upd};
       STATE.users[STATE.currentUser.uid]=STATE.userProfile;
       toast('Profil mis à jour !');
       setState({editing:false,editForm:null});
-    }catch(e){toast('Erreur',true);console.error(e);}
+    }catch(e){toast('Erreur : '+e.message,true);console.error(e);}
     saving=false;
   }));
   root.appendChild(tb);
@@ -785,7 +793,7 @@ function renderEditProfile(){
     const w=div({marginBottom:'18px'});
     w.appendChild(el('label',{style:S.LBL},label));
     const inp=el('input',{type:type||'text',value:ef[key]||'',placeholder:ph||'',style:{width:'100%',border:'none',borderBottom:'1.5px solid #d5cfc8',outline:'none',padding:'8px 0',fontFamily:"'Lora',serif",fontSize:'14px',color:'#2a2420',background:'transparent',display:'block'}});
-    inp.addEventListener('input',e=>{ STATE.editForm={...STATE.editForm,[key]:e.target.value}; });
+    inp.addEventListener('input',e=>{ if(STATE.editForm) STATE.editForm[key]=e.target.value; });
     w.appendChild(inp);
     return w;
   };
@@ -794,7 +802,7 @@ function renderEditProfile(){
   const bioW=div({marginBottom:'18px'});
   bioW.appendChild(el('label',{style:S.LBL},'Bio'));
   const bioTA=el('textarea',{placeholder:'En quelques mots…',rows:3,style:{width:'100%',border:'none',borderBottom:'1.5px solid #d5cfc8',outline:'none',padding:'8px 0',fontFamily:"'Lora',serif",fontSize:'14px',color:'#2a2420',background:'transparent',resize:'none',lineHeight:1.6,display:'block'}});
-  bioTA.value=ef.bio||'';bioTA.addEventListener('input',e=>{ STATE.editForm={...STATE.editForm,bio:e.target.value}; });
+  bioTA.value=ef.bio||'';bioTA.addEventListener('input',e=>{ if(STATE.editForm) STATE.editForm.bio=e.target.value; });
   bioW.appendChild(bioTA);fields.appendChild(bioW);
   fields.appendChild(mkF('Localisation','location','text','Paris, France'));
   fields.appendChild(mkF('Site web','website','url','https://votre-site.com'));
