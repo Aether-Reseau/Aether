@@ -950,148 +950,184 @@ function renderMessages(){
 // ADMIN PANEL
 // ══════════════════════════════════════════════════════════════════
 function renderAdmin(){
-  const {adminSection:sec, adminConfirm:conf} = STATE;
+  const sec = STATE.adminSection;
+  const conf = STATE.adminConfirm;
+
+  // Always reload users when entering admin
   const allUsers = Object.values(STATE.users).filter(u=>!u.isAdmin);
   const totalLikes = STATE.posts.reduce((s,p)=>s+(p.likes||0),0);
   const totalComments = STATE.posts.reduce((s,p)=>s+(p.comments||[]).length,0);
 
-  const root = div({minHeight:'100vh', background:'#1a1612'});
+  // ── palette aligned with main app ──
+  const BG    = '#faf7f3';
+  const CARD  = '#f5f0ea';
+  const BDR   = '#ede8e0';
+  const TXT   = '#2a2420';
+  const MUTED = '#a09890';
+  const ACCENT= '#c17a4a';
+  const DANGER= '#c0392b';
 
-  // Header
-  const hd = div({padding:'18px 16px', borderBottom:'1px solid #2e2820', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:'0', background:'#1a1612', zIndex:10});
+  const root = div({minHeight:'100vh', background:BG});
+
+  // ── Header ──
+  const hd = div({
+    padding:'14px 16px', borderBottom:'1px solid '+BDR,
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    position:'sticky', top:'0', background:BG, zIndex:10
+  });
   const logo = div({display:'flex', alignItems:'baseline', gap:'8px'},[
-    el('span',{style:{fontFamily:"'Lora',serif", fontWeight:500, fontSize:'20px', color:'#f5f0ea'}},'Æther'),
-    el('span',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:'#c17a4a', textTransform:'uppercase', letterSpacing:'0.14em', background:'#2e1e10', padding:'2px 8px', borderRadius:'10px'}},'Admin')
+    el('span',{style:{fontFamily:"'Lora',serif", fontWeight:500, fontSize:'21px', color:TXT, letterSpacing:'-0.02em'}},'Æther'),
+    el('span',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'9px', color:ACCENT, textTransform:'uppercase', letterSpacing:'0.14em', background:'#f0e8e0', padding:'2px 8px', borderRadius:'10px', fontWeight:600}},'Admin')
   ]);
   hd.appendChild(logo);
-  hd.appendChild(btn({background:'none', border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", fontSize:'11px', color:'#5a504a'},'Déconnexion', async()=>{
+  const hRight = div({display:'flex', gap:'10px', alignItems:'center'});
+  if(STATE.userProfile?.handle) hRight.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'12px', color:MUTED}},'@'+STATE.userProfile.handle));
+  hRight.appendChild(btn({background:'none', border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", fontSize:'11px', color:MUTED, padding:'0'},'Déco', async()=>{
     if(unsubPosts){unsubPosts();unsubPosts=null;}
     await signOut(auth);
     STATE={...STATE, currentUser:null, userProfile:null, posts:[], users:{}, tab:'feed', postsLoading:true};
     render();
   }));
+  hd.appendChild(hRight);
   root.appendChild(hd);
 
-  // Tabs
-  const tabs = div({display:'flex', borderBottom:'1px solid #2e2820'});
+  // ── Tabs ──
+  const tabs = div({display:'flex', borderBottom:'1px solid '+BDR});
   [['overview',"Vue d'ensemble",'◈'],['users','Membres','◎'],['posts','Publications','≡']].forEach(([id,label,icon])=>{
-    tabs.appendChild(btn({flex:1, background:'none', border:'none', cursor:'pointer', padding:'12px 4px', display:'flex', flexDirection:'column', alignItems:'center', gap:'3px', borderBottom:sec===id?'2px solid #c17a4a':'2px solid transparent'},[
-      el('span',{style:{fontSize:'15px', color:sec===id?'#c17a4a':'#5a504a'}}, icon),
-      el('span',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'9px', textTransform:'uppercase', letterSpacing:'0.08em', color:sec===id?'#c17a4a':'#5a504a'}}, label)
+    const active = sec===id;
+    tabs.appendChild(btn({
+      flex:1, background:'none', border:'none', cursor:'pointer',
+      padding:'12px 4px', display:'flex', flexDirection:'column', alignItems:'center', gap:'3px',
+      borderBottom: active?'2px solid '+ACCENT:'2px solid transparent'
+    },[
+      el('span',{style:{fontSize:'15px', color:active?ACCENT:MUTED}}, icon),
+      el('span',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'9px', textTransform:'uppercase', letterSpacing:'0.08em', color:active?ACCENT:MUTED}}, label)
     ], ()=>setState({adminSection:id})));
   });
   root.appendChild(tabs);
 
-  const content = div({padding:'20px 16px', overflowY:'auto'});
+  const content = div({padding:'20px 16px'});
 
+  // ── Overview ──
   if(sec==='overview'){
-    content.appendChild(el('div',{style:{...S.LBL, color:'#5a504a', marginBottom:'16px'}},'Statistiques'));
-    const grid = div({display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'24px'});
-    [['Membres',allUsers.length,'◎'],['Publications',STATE.posts.length,'≡'],["J'aime",totalLikes,'♡'],['Commentaires',totalComments,'◯']].forEach(([l,v,i])=>{
-      const c = div({background:'#221e1a', padding:'16px', borderRadius:'4px'});
-      c.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'22px', color:'#f5f0ea', fontWeight:700, marginBottom:'4px'}}, String(v)));
-      c.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:'#5a504a', textTransform:'uppercase', letterSpacing:'0.08em'}}, i+' '+l));
+    content.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'11px', fontWeight:600, color:MUTED, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'16px'}},'Statistiques'));
+    const grid = div({display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'28px'});
+    [['Membres',allUsers.length,'◎'],['Publications',STATE.posts.length,'≡'],["J'aime",totalLikes,'♡'],['Commentaires',totalComments,'◯']].forEach(([l,v,ic])=>{
+      const c = div({background:CARD, padding:'16px', borderRadius:'4px', border:'1px solid '+BDR});
+      c.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'24px', color:TXT, fontWeight:700, marginBottom:'4px'}}, String(v)));
+      c.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:MUTED, textTransform:'uppercase', letterSpacing:'0.08em'}}, ic+' '+l));
       grid.appendChild(c);
     });
     content.appendChild(grid);
-    content.appendChild(el('div',{style:{...S.LBL, color:'#5a504a', marginBottom:'12px'}},'Membres récents'));
-    allUsers.slice(-3).reverse().forEach(u=>{
-      const r = div({display:'flex', gap:'10px', alignItems:'center', padding:'10px 0', borderBottom:'1px solid #2e2820'});
-      r.appendChild(Avatar(u, 32));
-      const i = div({});
-      i.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'12px', fontWeight:600, color:'#f5f0ea'}}, u.displayName||''));
-      i.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:'#5a504a'}}, '@'+(u.handle||'')+' · '+(u.followers||0)+' abonnés'));
-      r.appendChild(i);
+    content.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'11px', fontWeight:600, color:MUTED, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'12px'}},'Membres récents'));
+    [...allUsers].slice(-3).reverse().forEach(u=>{
+      const r = div({display:'flex', gap:'12px', alignItems:'center', padding:'12px 0', borderBottom:'1px solid '+BDR});
+      r.appendChild(Avatar(u, 36));
+      const info = div({flex:1});
+      info.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'13px', fontWeight:600, color:TXT}}, u.displayName||''));
+      info.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'11px', color:MUTED}}, '@'+(u.handle||'')+' · '+(u.followers||0)+' abonnés'));
+      r.appendChild(info);
       content.appendChild(r);
     });
   }
 
+  // ── Users ──
   else if(sec==='users'){
-    // Reload all users from Firestore
-    if(allUsers.length===0){
-      content.appendChild(Spinner());
-      getDocs(collection(db,'users')).then(snap=>{
-        snap.forEach(d=>{ STATE.users[d.id]={uid:d.id,...d.data()}; });
-        render();
-      });
-    } else {
-      content.appendChild(el('div',{style:{...S.LBL, color:'#5a504a', marginBottom:'14px'}}, allUsers.length+' membre'+(allUsers.length>1?'s':'')));
-      allUsers.forEach(u=>{
-        const r = div({display:'flex', gap:'10px', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #2e2820'});
-        r.appendChild(Avatar(u, 38));
-        const i = div({flex:1, minWidth:'0'});
-        i.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'12px', fontWeight:600, color:'#f5f0ea'}}, u.displayName||''));
-        i.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:'#5a504a'}}, '@'+(u.handle||'')+' · '+STATE.posts.filter(p=>p.userId===u.uid).length+' posts'));
-        r.appendChild(i);
-        r.appendChild(btn({background:'none', border:'1px solid #3a2820', padding:'4px 10px', borderRadius:'12px', fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:'#8a4a3a', cursor:'pointer', flexShrink:0},
-          'Supprimer', ()=>setState({adminConfirm:{type:'user', uid:u.uid, name:u.displayName||u.handle||'?'}})));
-        content.appendChild(r);
-      });
-    }
+    // Always reload from Firestore to get fresh list
+    getDocs(collection(db,'users')).then(snap=>{
+      let changed=false;
+      snap.forEach(d=>{ if(!STATE.users[d.id]){STATE.users[d.id]={uid:d.id,...d.data()};changed=true;} });
+      if(changed) render();
+    });
+    const users = Object.values(STATE.users).filter(u=>!u.isAdmin);
+    content.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'11px', fontWeight:600, color:MUTED, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'14px'}}, users.length+' membre'+(users.length>1?'s':'')));
+    if(!users.length){ content.appendChild(Spinner()); }
+    else users.forEach(u=>{
+      const r = div({display:'flex', gap:'12px', alignItems:'center', padding:'12px 0', borderBottom:'1px solid '+BDR});
+      r.appendChild(Avatar(u, 40));
+      const info = div({flex:1, minWidth:'0'});
+      info.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'13px', fontWeight:600, color:TXT}}, u.displayName||''));
+      info.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'11px', color:MUTED}}, '@'+(u.handle||'')+' · '+STATE.posts.filter(p=>p.userId===u.uid).length+' posts'));
+      r.appendChild(info);
+      r.appendChild(btn({
+        background:'none', border:'1px solid #e0c0c0', padding:'5px 12px',
+        borderRadius:'14px', fontFamily:"'DM Sans',sans-serif", fontSize:'11px',
+        color:DANGER, cursor:'pointer', flexShrink:0
+      }, 'Supprimer', ()=>setState({adminConfirm:{type:'user', uid:u.uid, name:u.displayName||u.handle||'?'}})));
+      content.appendChild(r);
+    });
   }
 
+  // ── Posts ──
   else if(sec==='posts'){
-    content.appendChild(el('div',{style:{...S.LBL, color:'#5a504a', marginBottom:'14px'}}, STATE.posts.length+' publication'+(STATE.posts.length>1?'s':'')));
+    content.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'11px', fontWeight:600, color:MUTED, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'14px'}}, STATE.posts.length+' publication'+(STATE.posts.length>1?'s':'')));
     if(STATE.postsLoading){ content.appendChild(Spinner()); }
     else STATE.posts.forEach(post=>{
       const u = STATE.users[post.userId]||{displayName:'?', handle:'?'};
-      const r = div({padding:'12px 0', borderBottom:'1px solid #2e2820', display:'flex', gap:'10px', alignItems:'flex-start'});
-      r.appendChild(Avatar(u, 32));
-      const i = div({flex:1, minWidth:'0'});
-      i.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'11px', fontWeight:600, color:'#a09890'}}, '@'+(u.handle||'?')+' '));
+      const r = div({padding:'14px 0', borderBottom:'1px solid '+BDR, display:'flex', gap:'12px', alignItems:'flex-start'});
+      r.appendChild(Avatar(u, 34));
+      const info = div({flex:1, minWidth:'0'});
+      const nh = div({display:'flex', gap:'8px', alignItems:'baseline', marginBottom:'4px'});
+      nh.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'12px', fontWeight:600, color:TXT}}, u.displayName||'?'));
+      nh.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'11px', color:MUTED}}, '@'+(u.handle||'?')));
+      info.appendChild(nh);
       if(post.content){
         const pt = document.createElement('p');
-        pt.style.cssText = "font-family:'Lora',serif;font-size:12px;color:#7a7068;margin:4px 0 0;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;";
+        pt.style.cssText = "font-family:'Lora',serif;font-size:13px;color:#5a504a;margin:0 0 4px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;";
         pt.textContent = post.content;
-        i.appendChild(pt);
+        info.appendChild(pt);
       }
-      if(post.media) i.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:'#5a504a', marginTop:'3px'}}, post.media.type==='image'?'🖼 Image':'▶ Vidéo'));
-      i.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:'#3a3430', marginTop:'3px'}}, '♡ '+(post.likes||0)+' · ◯ '+(post.comments||[]).length));
-      r.appendChild(i);
-      r.appendChild(btn({background:'none', border:'1px solid #3a2820', padding:'3px 8px', borderRadius:'10px', fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:'#8a4a3a', cursor:'pointer', flexShrink:0},
-        '✕', ()=>setState({adminConfirm:{type:'post', id:post.id, name:(post.content||'(média)').slice(0,30)+'…'}})));
+      if(post.media) info.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:MUTED}}, post.media.type==='image'?'🖼 Image':'▶ Vidéo'));
+      info.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif", fontSize:'10px', color:MUTED, marginTop:'3px'}}, '♡ '+(post.likes||0)+' · ◯ '+(post.comments||[]).length));
+      r.appendChild(info);
+      r.appendChild(btn({
+        background:'none', border:'1px solid #e0c0c0', padding:'4px 10px',
+        borderRadius:'10px', fontFamily:"'DM Sans',sans-serif", fontSize:'11px',
+        color:DANGER, cursor:'pointer', flexShrink:0
+      }, '✕', ()=>setState({adminConfirm:{type:'post', id:post.id, name:(post.content||'(média)').slice(0,30)+'…'}})));
       content.appendChild(r);
     });
   }
 
   root.appendChild(content);
 
-  // Confirm modal
+  // ── Confirm modal ──
   if(conf){
-    const overlay = div({position:'fixed', inset:'0', background:'rgba(10,8,6,0.88)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100, padding:'20px'});
-    const modal = div({background:'#221e1a', padding:'28px 24px', maxWidth:'340px', width:'100%', borderRadius:'4px'});
-    modal.appendChild(el('div',{style:{fontFamily:"'Lora',serif", fontSize:'16px', color:'#f5f0ea', marginBottom:'10px'}}, 'Confirmer la suppression'));
+    const overlay = div({position:'fixed', inset:'0', background:'rgba(42,36,32,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100, padding:'20px'});
+    const modal = div({background:BG, padding:'28px 24px', maxWidth:'340px', width:'100%', borderRadius:'4px', boxShadow:'0 8px 40px rgba(42,36,32,0.2)'});
+    modal.appendChild(el('div',{style:{fontFamily:"'Lora',serif", fontSize:'17px', color:TXT, marginBottom:'10px'}}, 'Confirmer la suppression'));
     const msg = document.createElement('p');
-    msg.style.cssText = "font-family:'DM Sans',sans-serif;font-size:13px;color:#7a7068;margin-bottom:20px;line-height:1.6;";
-    msg.innerHTML = 'Supprimer '+(conf.type==='user'?'le compte':'la publication')+' <strong style="color:#a09890">« '+conf.name+' »</strong> ?'+(conf.type==='user'?' Ses publications seront aussi supprimées.':'');
+    msg.style.cssText = "font-family:'DM Sans',sans-serif;font-size:13px;color:#7a7068;margin-bottom:22px;line-height:1.6;";
+    msg.innerHTML = 'Supprimer '+(conf.type==='user'?'le compte':'la publication')+' <strong style="color:'+TXT+'">« '+conf.name+' »</strong> ?'+(conf.type==='user'?' Ses publications seront aussi supprimées.':'');
     modal.appendChild(msg);
-    const btns = div({display:'flex', gap:'10px'});
-    btns.appendChild(btn({flex:1, background:'none', border:'1px solid #3a3430', padding:'10px', fontFamily:"'DM Sans',sans-serif", fontSize:'12px', color:'#7a7068', cursor:'pointer', borderRadius:'2px'},
-      'Annuler', ()=>setState({adminConfirm:null})));
-    btns.appendChild(btn({flex:1, background:'#8a2010', border:'none', padding:'10px', fontFamily:"'DM Sans',sans-serif", fontSize:'12px', color:'#f5f0ea', cursor:'pointer', borderRadius:'2px', fontWeight:600},
-      'Supprimer', async()=>{
-        if(conf.type==='post'){
-          try{ await deleteDoc(doc(db,'posts',conf.id)); }catch(e){console.error(e);}
-          setState({adminConfirm:null});
-        } else {
-          // Delete user posts then user doc
-          try{
-            const userPosts = STATE.posts.filter(p=>p.userId===conf.uid);
-            await Promise.all(userPosts.map(p=>deleteDoc(doc(db,'posts',p.id))));
-            await deleteDoc(doc(db,'users',conf.uid));
-            delete STATE.users[conf.uid];
-          }catch(e){console.error(e);}
-          setState({adminConfirm:null});
-        }
-      }));
-    modal.appendChild(btns);
+    const modalBtns = div({display:'flex', gap:'10px'});
+    modalBtns.appendChild(btn({
+      flex:1, background:'none', border:'1px solid '+BDR, padding:'11px',
+      fontFamily:"'DM Sans',sans-serif", fontSize:'12px', color:MUTED,
+      cursor:'pointer', borderRadius:'2px'
+    }, 'Annuler', ()=>setState({adminConfirm:null})));
+    modalBtns.appendChild(btn({
+      flex:1, background:DANGER, border:'none', padding:'11px',
+      fontFamily:"'DM Sans',sans-serif", fontSize:'12px', color:'#fff',
+      cursor:'pointer', borderRadius:'2px', fontWeight:600
+    }, 'Supprimer', async()=>{
+      if(conf.type==='post'){
+        try{ await deleteDoc(doc(db,'posts',conf.id)); }catch(e){console.error(e);}
+        setState({adminConfirm:null});
+      } else {
+        try{
+          const userPosts = STATE.posts.filter(p=>p.userId===conf.uid);
+          await Promise.all(userPosts.map(p=>deleteDoc(doc(db,'posts',p.id))));
+          await deleteDoc(doc(db,'users',conf.uid));
+          delete STATE.users[conf.uid];
+        }catch(e){console.error(e);}
+        setState({adminConfirm:null});
+      }
+    }));
+    modal.appendChild(modalBtns);
     overlay.appendChild(modal);
     root.appendChild(overlay);
   }
-
-  return root;
-}
-
 function renderApp(){
   const me=STATE.userProfile||{};
   const {tab,profileUid,editing}=STATE;
