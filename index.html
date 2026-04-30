@@ -735,20 +735,38 @@ function renderEditProfile(){
         avatarColor: sf.avatarColor||me.avatarColor||AV_COLORS[0]
       };
       if(sf.avatarFile){
-        // Convert avatar to base64
+        // Compress avatar heavily to stay under Firestore 1MB limit
         upd.photoURL=await new Promise((res,rej)=>{
           const img=new Image();
           img.onload=()=>{
+            // Use small size (80x80) and low quality to keep under ~10KB
+            const SIZE=80;
             const canvas=document.createElement('canvas');
-            canvas.width=160;canvas.height=160;
+            canvas.width=SIZE;canvas.height=SIZE;
             const ctx=canvas.getContext('2d');
-            ctx.beginPath();ctx.arc(80,80,80,0,Math.PI*2);ctx.clip();
-            ctx.drawImage(img,0,0,160,160);
-            res(canvas.toDataURL('image/jpeg',0.8));
+            // Crop to square from center
+            const s=Math.min(img.width,img.height);
+            const ox=(img.width-s)/2;
+            const oy=(img.height-s)/2;
+            ctx.drawImage(img,ox,oy,s,s,0,0,SIZE,SIZE);
+            // Try progressively lower quality until under 700KB base64
+            let q=0.5;
+            let data=canvas.toDataURL('image/jpeg',q);
+            while(data.length>700000&&q>0.1){
+              q-=0.1;
+              data=canvas.toDataURL('image/jpeg',q);
+            }
+            res(data);
           };
           img.onerror=rej;
           img.src=URL.createObjectURL(sf.avatarFile);
         });
+        // Double-check size
+        if(upd.photoURL&&upd.photoURL.length>900000){
+          toast('Photo trop lourde, utilisez une image plus petite',true);
+          saving=false;
+          return;
+        }
       }
       await updateDoc(doc(db,'users',STATE.currentUser.uid),upd);
       await updateProfile(STATE.currentUser,{displayName:upd.displayName,...(upd.photoURL?{photoURL:upd.photoURL}:{})});
