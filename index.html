@@ -1054,7 +1054,7 @@ function renderAdmin(){
       r.appendChild(inf);
       const actions=div({display:'flex',gap:'6px'});
       if(isSuperAdmin){
-        actions.appendChild(btn({background:'none',border:'1px solid '+BDR,padding:'4px 10px',borderRadius:'12px',fontFamily:"'DM Sans',sans-serif",fontSize:'10px",color:MUTED,cursor:"pointer",flexShrink:0'},'→ Admin',async()=>{
+        actions.appendChild(btn({background:'none',border:'1px solid '+BDR,padding:'4px 10px',borderRadius:'12px',fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:MUTED,cursor:'pointer',flexShrink:0},'→ Admin',async()=>{
           try{await updateDoc(doc(db,'users',u.uid),{isAdmin:true});}catch(e){toast('Erreur',true);}
           STATE.users[u.uid]={...u,isAdmin:true};render();
         }));
