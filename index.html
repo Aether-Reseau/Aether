@@ -95,64 +95,7 @@ const mfData = {
 const mfBlob = new Blob([JSON.stringify(mfData)], {type: 'application/manifest+json'});
 document.getElementById('manifest-ph').href = URL.createObjectURL(mfBlob);
 
-// ── Service Worker for offline support ──
-if ('serviceWorker' in navigator) {
-  const swCode = `
-    const CACHE_NAME = 'aether-v3';
-    const OFFLINE_URL = self.location.href.replace('/sw.js','');
-
-    self.addEventListener('install', e => {
-      e.waitUntil(
-        caches.open(CACHE_NAME).then(cache => {
-          return cache.addAll([OFFLINE_URL]);
-        }).catch(() => {})
-      );
-      self.skipWaiting();
-    });
-
-    self.addEventListener('activate', e => {
-      e.waitUntil(
-        caches.keys().then(keys =>
-          Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-        )
-      );
-      return self.clients.claim();
-    });
-
-    self.addEventListener('fetch', e => {
-      if (e.request.method !== 'GET') return;
-      if (e.request.url.includes('firebasejs') || e.request.url.includes('googleapis')) return;
-      e.respondWith(
-        caches.match(e.request).then(cached => {
-          const fetchPromise = fetch(e.request).then(response => {
-            if (response && response.status === 200) {
-              const clone = response.clone();
-              caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-            }
-            return response;
-          }).catch(() => cached);
-          return cached || fetchPromise;
-        })
-      );
-    });
-  `;
-  const swBlob = new Blob([swCode], {type: 'text/javascript'});
-  const swURL = URL.createObjectURL(swBlob);
-  navigator.serviceWorker.register(swURL, {scope: './'})
-    .then(reg => {
-      console.log('SW registered');
-      // Check for updates
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            toast('Mise à jour disponible — rechargez la page');
-          }
-        });
-      });
-    })
-    .catch(err => console.warn('SW registration failed:', err));
-}
+// Service Worker désactivé (blob: URL non supporté sur GitHub Pages)
 
 // ── Install prompt ──
 let deferredPrompt = null;
