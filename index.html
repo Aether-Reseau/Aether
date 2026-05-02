@@ -1371,21 +1371,31 @@ function renderAdmin(){
       inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED,marginTop:'2px'}},'@'+(u.handle||'')));
       r.appendChild(inf);
       if(u.uid!==STATE.currentUser.uid){
-        const sel=document.createElement('select');
-        sel.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;color:"+TXT+";background:"+CARD+";border:1px solid "+BDR+";padding:4px 8px;borderRadius:8px;cursor:pointer;";
-        [['member','Membre'],['admin','Admin'],['superAdmin','Super Admin']].forEach(([val,lbl])=>{
-          const o=document.createElement('option');
-          o.value=val;o.textContent=lbl;
-          if((val==='superAdmin'&&u.isSuperAdmin)||(val==='admin'&&u.isAdmin&&!u.isSuperAdmin)||(val==='member'&&!u.isAdmin&&!u.isSuperAdmin)) o.selected=true;
-          sel.appendChild(o);
+        const currentRole = u.isSuperAdmin?'superAdmin':u.isAdmin?'admin':'member';
+        const rolesBtns = div({display:'flex',gap:'4px',flexShrink:0});
+        [['member','Membre'],['admin','Admin'],['superAdmin','Super']].forEach(([val,lbl])=>{
+          const isActive = currentRole===val;
+          const rb = div({
+            padding:'4px 10px', borderRadius:'12px', cursor:'pointer',
+            fontFamily:"'DM Sans',sans-serif", fontSize:'10px', fontWeight: isActive?600:400,
+            color: isActive?(val==='superAdmin'?GOLD:val==='admin'?ACCENT:TXT):MUTED,
+            background: isActive?(val==='superAdmin'?'#fdf8e8':val==='admin'?'#f0e8e0':'#ede8e0'):'transparent',
+            border:'1px solid '+(isActive?(val==='superAdmin'?GOLD:val==='admin'?ACCENT:BDR):BDR),
+            userSelect:'none'
+          }, [lbl]);
+          rb.addEventListener('click', async ()=>{
+            if(isActive) return;
+            const upd={isAdmin:val==='admin'||val==='superAdmin', isSuperAdmin:val==='superAdmin'};
+            try{
+              await updateDoc(doc(db,'users',u.uid),upd);
+              STATE.users[u.uid]={...u,...upd};
+              toast('Rôle mis à jour');
+              render();
+            }catch(ex){ toast('Erreur : '+ex.message, true); }
+          });
+          rolesBtns.appendChild(rb);
         });
-        sel.addEventListener('change',async e=>{
-          const v=e.target.value;
-          const upd={isAdmin:v==='admin'||v==='superAdmin',isSuperAdmin:v==='superAdmin'};
-          try{await updateDoc(doc(db,'users',u.uid),upd);STATE.users[u.uid]={...u,...upd};toast('Rôle mis à jour');render();}
-          catch(ex){toast('Erreur : '+ex.message,true);}
-        });
-        r.appendChild(sel);
+        r.appendChild(rolesBtns);
       }
       content.appendChild(r);
     });
