@@ -1233,24 +1233,23 @@ function renderAdmin(){
     ? [['overview',"Vue d'ensemble",'◈'],['members','Membres','◎'],['admins','Admins','⬡'],['posts','Publications','≡'],['roles','Rôles','◇']]
     : [['overview',"Vue d'ensemble",'◈'],['members','Membres','◎'],['posts','Publications','≡']];
 
-  const tabs = div({display:'flex',borderBottom:'1px solid '+BDR,overflowX:'auto',WebkitOverflowScrolling:'touch'});
+  const tabs = div({display:'flex',borderBottom:'1px solid '+BDR});
   tabDefs.forEach(([id,label,icon])=>{
     const active=sec===id;
     const isGold=isSuperAdmin&&id==='roles';
     const activeColor=isGold?GOLD:ACCENT;
-    const tabBtn=document.createElement('button');
-    tabBtn.style.cssText='flex:1;min-width:60px;background:none;border:none;cursor:pointer;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;border-bottom:2px solid '+(active?activeColor:'transparent')+';outline:none;-webkit-appearance:none;';
-    const iconEl=document.createElement('span');
-    iconEl.style.cssText='font-size:14px;color:'+(active?activeColor:MUTED)+';';
-    iconEl.textContent=icon;
-    const labelEl=document.createElement('span');
-    labelEl.style.cssText="font-family:'DM Sans',sans-serif;font-size:8px;text-transform:uppercase;letter-spacing:0.08em;color:"+(active?activeColor:MUTED)+";white-space:nowrap;";
-    labelEl.textContent=label;
-    tabBtn.appendChild(iconEl);
-    tabBtn.appendChild(labelEl);
-    tabBtn.addEventListener('click',()=>setState({adminSection:id}));
-    tabBtn.addEventListener('touchend',e=>{e.preventDefault();setState({adminSection:id});});
-    tabs.appendChild(tabBtn);
+    const tabItem=div({
+      flex:'1',minWidth:'55px',cursor:'pointer',padding:'12px 4px',
+      display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',
+      borderBottom:'2px solid '+(active?activeColor:'transparent'),
+      userSelect:'none'
+    });
+    const iconEl=el('span',{style:{fontSize:'14px',color:active?activeColor:MUTED}},icon);
+    const labelEl=el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'8px',textTransform:'uppercase',letterSpacing:'0.08em',color:active?activeColor:MUTED,whiteSpace:'nowrap'}},label);
+    tabItem.appendChild(iconEl);
+    tabItem.appendChild(labelEl);
+    tabItem.addEventListener('click',()=>{ STATE.adminSection=id; render(); });
+    tabs.appendChild(tabItem);
   });
   root.appendChild(tabs);
 
@@ -1433,7 +1432,6 @@ function renderApp(){
   const NAV=[
     {id:'feed',    label:'Fil',      icon:'≡'},
     {id:'explore', label:'Explorer', icon:'◎'},
-    {id:'videos',  label:'Vidéos',   icon:'▶'},
     {id:'messages',label:'Messages', icon:'◇'},
     {id:'me',      label:'Profil',   icon:'○'},
     ...((me.isAdmin||me.isSuperAdmin)?[{id:'admin', label:me.isSuperAdmin?'S.Admin':'Admin', icon:me.isSuperAdmin?'★':'◈'}]:[]),
@@ -1465,7 +1463,6 @@ function renderApp(){
   const content=div({flex:1,overflowY:'auto',paddingBottom:'72px'});
   if(tab==='feed')         content.appendChild(renderFeed());
   else if(tab==='explore') content.appendChild(renderExplore());
-  else if(tab==='videos')  content.appendChild(renderVideos());
   else if(tab==='messages')content.appendChild(renderMessages());
   else if(tab==='me'&&!editing)  content.appendChild(renderProfile(me,true,()=>{}));
   else if(tab==='me'&&editing)   content.appendChild(renderEditProfile());
