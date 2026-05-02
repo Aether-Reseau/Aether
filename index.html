@@ -977,11 +977,17 @@ function convKey(uid1, uid2) {
 function getMutualFollows() {
   const me = STATE.userProfile || {};
   const myFollowing = me.followingIds || [];
+  const iAmAdmin = me.isAdmin || me.isSuperAdmin;
   return Object.values(STATE.users).filter(u => {
     if (u.uid === STATE.currentUser?.uid) return false;
     if (!u.handle) return false;
     const theyFollowMe = (u.followingIds || []).includes(STATE.currentUser?.uid);
     const iFollowThem = myFollowing.includes(u.uid);
+    // Admin/SuperAdmin can message anyone they follow (one-way is enough)
+    if (iAmAdmin) return iFollowThem || theyFollowMe;
+    // SuperAdmins/Admins appear in everyone's list if there is mutual follow
+    if (u.isAdmin || u.isSuperAdmin) return iFollowThem && theyFollowMe;
+    // Normal users: strict mutual follow required
     return theyFollowMe && iFollowThem;
   });
 }
