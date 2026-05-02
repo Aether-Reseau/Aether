@@ -237,8 +237,8 @@ let STATE = {
   openComments:{},
   commentTexts:{},
   playingVideo:null,
-  msgActive:   null,
-  msgConvs:    null,
+  msgActive:   null,  // uid of active conversation
+  msgConvs:    {},
   msgInput:    '',
   adminSection:'overview',
   adminConfirm:null,
@@ -246,6 +246,7 @@ let STATE = {
   toast:       null,
 };
 let unsubPosts = null;
+let unsubConv = null; // Active conversation listener
 
 function setState(patch){ Object.assign(STATE,patch); render(); }
 
@@ -968,60 +969,210 @@ function renderExplore(){
 // ══════════════════════════════════════════════════════════════════
 // MESSAGES (local pour l'instant — Firestore-ready)
 // ══════════════════════════════════════════════════════════════════
-function renderMessages(){
-  const allUsers=Object.values(STATE.users).filter(u=>u.uid!==STATE.currentUser?.uid&&u.handle);
-  if(!STATE.msgConvs){
-    STATE.msgConvs=allUsers.slice(0,5).map((u,i)=>({id:i+1,uid:u.uid,messages:i===0?[{from:'them',text:'Bonjour ! Je suis sur Æther 👋'}]:[]}));
-  }
-  const root=div({display:'flex',height:'calc(100vh - 140px)',minHeight:'400px'});
-  const list=div({width:'155px',borderRight:'1px solid #ede8e0',flexShrink:0,overflowY:'auto'});
-  list.appendChild(div({padding:'14px 12px 8px',fontFamily:"'DM Sans',sans-serif",fontSize:'10px',fontWeight:600,color:'#a09890',textTransform:'uppercase',letterSpacing:'0.1em'},['Messages']));
-  (STATE.msgConvs||[]).forEach(c=>{
-    const u=STATE.users[c.uid]||{displayName:'?'};
-    const last=c.messages[c.messages.length-1];
-    const row=div({padding:'10px 12px',cursor:'pointer',display:'flex',gap:'8px',alignItems:'center',background:STATE.msgActive===c.id?'#f5f0ea':'transparent'});
-    row.appendChild(Avatar(u,28));
-    const inf=div({minWidth:0});
-    inf.appendChild(el('div',{style:{...S.sans(11,'#2a2420',600),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},u.displayName||'?'));
-    if(last) inf.appendChild(el('div',{style:{...S.sans(10,'#a09890'),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},(last.from==='me'?'Vous: ':'')+last.text));
-    row.appendChild(inf);
-    row.addEventListener('click',()=>setState({msgActive:c.id}));
-    list.appendChild(row);
+// ── Messaging helpers ─────────────────────────────────────────────
+function convKey(uid1, uid2) {
+  return [uid1, uid2].sort().join('_');
+}
+
+function getMutualFollows() {
+  const me = STATE.userProfile || {};
+  const myFollowing = me.followingIds || [];
+  return Object.values(STATE.users).filter(u => {
+    if (u.uid === STATE.currentUser?.uid) return false;
+    if (!u.handle) return false;
+    const theyFollowMe = (u.followingIds || []).includes(STATE.currentUser?.uid);
+    const iFollowThem = myFollowing.includes(u.uid);
+    return theyFollowMe && iFollowThem;
   });
-  root.appendChild(list);
-  const chat=div({flex:1,display:'flex',flexDirection:'column',overflow:'hidden'});
-  const ac=(STATE.msgConvs||[]).find(c=>c.id===STATE.msgActive);
-  if(!ac){
-    chat.appendChild(div({flex:1,display:'flex',alignItems:'center',justifyContent:'center'},[p({...S.serif(13,'#c5bfb8'),fontStyle:'italic'},'Sélectionnez une conversation')]));
-  } else {
-    const au=STATE.users[ac.uid]||{displayName:'?'};
-    const hd=div({padding:'10px 14px',borderBottom:'1px solid #ede8e0',display:'flex',gap:'8px',alignItems:'center',flexShrink:0});
-    hd.appendChild(Avatar(au,28));
-    hd.appendChild(el('span',{style:{...S.sans(13,'#2a2420',600)}},au.displayName||''));
-    chat.appendChild(hd);
-    const msgs=div({flex:1,padding:'12px 14px',overflowY:'auto',display:'flex',flexDirection:'column',gap:'8px'});
-    ac.messages.forEach(m=>{
-      const mb=div({display:'flex',justifyContent:m.from==='me'?'flex-end':'flex-start'});
-      mb.appendChild(div({maxWidth:'75%',padding:'8px 12px',borderRadius:m.from==='me'?'14px 14px 3px 14px':'14px 14px 14px 3px',background:m.from==='me'?'#2a2420':'#f0ebe4',fontFamily:"'Lora',serif",fontSize:'14px',lineHeight:1.55,color:m.from==='me'?'#f5f0ea':'#3a3430'},[m.text]));
-      msgs.appendChild(mb);
-    });
-    chat.appendChild(msgs);
-    const inp=div({padding:'10px 14px',borderTop:'1px solid #ede8e0',display:'flex',gap:'8px',flexShrink:0});
-    const ti=el('input',{type:'text',placeholder:'Écrire…',value:STATE.msgInput||'',style:{flex:1,border:'none',borderBottom:'1px solid #d5cfc8',outline:'none',padding:'6px 0',fontFamily:"'Lora',serif",fontSize:'14px',color:'#2a2420',background:'transparent'}});
-    ti.addEventListener('input',e=>{ STATE.msgInput=e.target.value; });
-    const send=()=>{
-      if(!STATE.msgInput?.trim())return;
-      STATE.msgConvs=STATE.msgConvs.map(c=>c.id===STATE.msgActive?{...c,messages:[...c.messages,{from:'me',text:STATE.msgInput}]}:c);
-      STATE.msgInput='';render();
-      setTimeout(()=>msgs.scrollTop=msgs.scrollHeight,30);
-    };
-    ti.addEventListener('keydown',e=>{if(e.key==='Enter')send();});
-    inp.appendChild(ti);
-    inp.appendChild(btn({background:'#2a2420',color:'#f5f0ea',border:'none',width:'30px',height:'30px',borderRadius:'50%',fontSize:'14px',cursor:'pointer',flexShrink:0},'↑',send));
-    chat.appendChild(inp);
-    setTimeout(()=>msgs.scrollTop=msgs.scrollHeight,30);
+}
+
+// Subscribe to a conversation in real-time
+function subscribeToConv(uid) {
+  if (unsubConv) { unsubConv(); unsubConv = null; }
+  const key = convKey(STATE.currentUser.uid, uid);
+  const convRef = doc(db, 'conversations', key);
+  unsubConv = onSnapshot(convRef, snap => {
+    if (snap.exists()) {
+      STATE.msgConvs[key] = snap.data();
+    } else {
+      STATE.msgConvs[key] = { messages: [] };
+    }
+    render();
+  });
+}
+
+function getConvMessages(uid) {
+  const key = convKey(STATE.currentUser.uid, uid);
+  return (STATE.msgConvs[key] || { messages: [] }).messages || [];
+}
+
+// ── MESSAGES VIEW ─────────────────────────────────────────────────
+function renderMessages() {
+  const mutual = getMutualFollows();
+  const activeUid = STATE.msgActive;
+
+  // If a conversation is open, show it full screen
+  if (activeUid) {
+    return renderConversation(activeUid);
   }
-  root.appendChild(chat);
+
+  // Unsubscribe from any active conv listener when back on list
+  if (unsubConv) { unsubConv(); unsubConv = null; }
+
+  const root = div({ minHeight: '400px' });
+
+  // Header
+  const hd = div({ padding: '18px 16px 12px', borderBottom: '1px solid #ede8e0' });
+  hd.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '11px', fontWeight: 600, color: '#a09890', textTransform: 'uppercase', letterSpacing: '0.1em' } }, 'Messages'));
+  root.appendChild(hd);
+
+  if (!mutual.length) {
+    const empty = div({ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 28px', gap: '12px' });
+    empty.appendChild(el('div', { style: { fontSize: '36px', opacity: '0.3' } }, '◇'));
+    empty.appendChild(p({ fontFamily: "'Lora',serif", fontSize: '14px', color: '#a09890', fontStyle: 'italic', textAlign: 'center' }, 'Aucune conversation disponible.'));
+    empty.appendChild(p({ fontFamily: "'DM Sans',sans-serif", fontSize: '12px', color: '#c5bfb8', textAlign: 'center' }, 'Suivez-vous mutuellement pour envoyer des messages.'));
+    root.appendChild(empty);
+    return root;
+  }
+
+  mutual.forEach(u => {
+    const messages = getConvMessages(u.uid);
+    const last = messages[messages.length - 1];
+    const unread = messages.filter(m => m.senderId !== STATE.currentUser.uid && !m.read).length;
+
+    const row = div({ display: 'flex', gap: '14px', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #ede8e0', cursor: 'pointer' });
+    row.addEventListener('click', () => {
+      subscribeToConv(u.uid);
+      setState({ msgActive: u.uid });
+    });
+    row.onmouseenter = () => row.style.background = '#f5f0ea';
+    row.onmouseleave = () => row.style.background = 'transparent';
+    row.appendChild(Avatar(u, 46));
+
+    const info = div({ flex: 1, minWidth: '0' });
+    const nameRow = div({ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' });
+    nameRow.appendChild(el('span', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: 600, color: '#2a2420' } }, u.displayName || ''));
+    nameRow.appendChild(el('span', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#a09890' } }, '@' + (u.handle || '')));
+    info.appendChild(nameRow);
+    if (last) {
+      const isMe = last.senderId === STATE.currentUser.uid;
+      info.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '12px', color: unread ? '#2a2420' : '#a09890', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: unread ? 600 : 400 } }, (isMe ? 'Vous : ' : '') + last.text));
+    } else {
+      info.appendChild(el('div', { style: { fontFamily: "'Lora',serif", fontSize: '12px', color: '#c5bfb8', fontStyle: 'italic' } }, 'Commencer la conversation'));
+    }
+    row.appendChild(info);
+    if (unread > 0) {
+      row.appendChild(div({ background: '#c17a4a', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans',sans-serif", fontSize: '10px', fontWeight: 600, flexShrink: 0 }, [String(unread)]));
+    } else {
+      row.appendChild(el('span', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '16px', color: '#c5bfb8' } }, '›'));
+    }
+    root.appendChild(row);
+  });
+
+  return root;
+}
+
+// ── CONVERSATION VIEW (Firebase real-time) ───────────────────────
+function renderConversation(uid) {
+  const u = STATE.users[uid] || { displayName: '?', handle: '?' };
+  const messages = getConvMessages(uid);
+  const key = convKey(STATE.currentUser.uid, uid);
+
+  // Mark incoming messages as read in Firestore
+  const hasUnread = messages.some(m => m.senderId !== STATE.currentUser.uid && !m.read);
+  if (hasUnread) {
+    const updated = messages.map(m =>
+      m.senderId !== STATE.currentUser.uid ? { ...m, read: true } : m
+    );
+    updateDoc(doc(db, 'conversations', key), { messages: updated }).catch(() => {});
+  }
+
+  const root = div({ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)' });
+
+  // Header
+  const hd = div({ padding: '12px 16px', borderBottom: '1px solid #ede8e0', display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 });
+  hd.appendChild(btn({ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#a09890', padding: '0', lineHeight: 1 }, '←', () => {
+    if (unsubConv) { unsubConv(); unsubConv = null; }
+    setState({ msgActive: null });
+  }));
+  hd.appendChild(Avatar(u, 34));
+  const hInfo = div({ flex: 1, minWidth: '0' });
+  hInfo.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: 600, color: '#2a2420' } }, u.displayName || ''));
+  hInfo.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#a09890' } }, '@' + (u.handle || '')));
+  hd.appendChild(hInfo);
+  root.appendChild(hd);
+
+  // Messages
+  const msgsDiv = div({ flex: 1, padding: '14px 16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' });
+
+  if (!messages.length) {
+    const empty = div({ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '8px' });
+    empty.appendChild(el('div', { style: { fontSize: '28px', opacity: '0.3' } }, '◇'));
+    empty.appendChild(p({ fontFamily: "'Lora',serif", fontSize: '13px', color: '#c5bfb8', fontStyle: 'italic' }, 'Commencez la conversation'));
+    msgsDiv.appendChild(empty);
+  } else {
+    messages.forEach((m, idx) => {
+      const isMe = m.senderId === STATE.currentUser.uid;
+      const mb = div({ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '6px' });
+      const bubble = div({
+        maxWidth: '72%', padding: '9px 13px',
+        borderRadius: isMe ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
+        background: isMe ? '#2a2420' : '#f0ebe4',
+        fontFamily: "'Lora',serif", fontSize: '14px', lineHeight: 1.6,
+        color: isMe ? '#f5f0ea' : '#3a3430'
+      }, [m.text]);
+
+      // Time
+      const ts = m.ts ? new Date(m.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+      const timeEl = el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '9px', color: isMe ? 'rgba(245,240,234,0.5)' : '#c5bfb8', marginTop: '3px', textAlign: isMe ? 'right' : 'left' } }, ts);
+
+      const bubbleWrap = div({ maxWidth: '72%' }, [bubble, timeEl]);
+
+      if (isMe) {
+        const delBtn = btn({ background: 'none', border: 'none', cursor: 'pointer', color: '#c5bfb8', fontSize: '11px', padding: '0 4px', alignSelf: 'center', flexShrink: 0, opacity: '0', transition: 'opacity 0.2s' }, '✕', async () => {
+          const updated = messages.filter((_, i) => i !== idx);
+          try { await updateDoc(doc(db, 'conversations', key), { messages: updated }); } catch(e) { console.error(e); }
+        });
+        mb.appendChild(delBtn);
+        mb.appendChild(bubbleWrap);
+        mb.onmouseenter = () => delBtn.style.opacity = '1';
+        mb.onmouseleave = () => delBtn.style.opacity = '0';
+        let pressTimer;
+        bubble.addEventListener('touchstart', () => { pressTimer = setTimeout(() => delBtn.style.opacity = '1', 600); });
+        bubble.addEventListener('touchend', () => clearTimeout(pressTimer));
+      } else {
+        mb.appendChild(bubbleWrap);
+      }
+      msgsDiv.appendChild(mb);
+    });
+  }
+  root.appendChild(msgsDiv);
+  setTimeout(() => msgsDiv.scrollTop = msgsDiv.scrollHeight, 30);
+
+  // Input
+  const inp = div({ padding: '10px 16px', borderTop: '1px solid #ede8e0', display: 'flex', gap: '8px', flexShrink: 0 });
+  const ti = el('input', { type: 'text', placeholder: 'Envoyer un message...', value: STATE.msgInput || '', style: { flex: 1, border: 'none', borderBottom: '1px solid #d5cfc8', outline: 'none', padding: '6px 0', fontFamily: "'Lora',serif", fontSize: '14px', color: '#2a2420', background: 'transparent' } });
+  ti.addEventListener('input', e => { STATE.msgInput = e.target.value; });
+  const send = async () => {
+    const txt = STATE.msgInput?.trim();
+    if (!txt) return;
+    STATE.msgInput = '';
+    const newMsg = { senderId: STATE.currentUser.uid, text: txt, ts: Date.now(), read: false };
+    const convRef = doc(db, 'conversations', key);
+    try {
+      const snap = await getDoc(convRef);
+      if (snap.exists()) {
+        await updateDoc(convRef, { messages: arrayUnion(newMsg), updatedAt: serverTimestamp() });
+      } else {
+        await setDoc(convRef, { participants: [STATE.currentUser.uid, uid], messages: [newMsg], updatedAt: serverTimestamp() });
+      }
+    } catch(e) { console.error(e); toast('Erreur envoi', true); }
+  };
+  ti.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+  inp.appendChild(ti);
+  inp.appendChild(btn({ background: '#2a2420', color: '#f5f0ea', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '14px', cursor: 'pointer', flexShrink: 0 }, '↑', send));
+  root.appendChild(inp);
+
   return root;
 }
 
@@ -1275,6 +1426,7 @@ function renderApp(){
   if(me.handle) right.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a09890'}},`@${me.handle}`));
   right.appendChild(btn({background:'none',border:'none',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:'#c5bfb8',padding:'0'},'Déco',async()=>{
     if(unsubPosts){unsubPosts();unsubPosts=null;}
+    if(unsubConv){unsubConv();unsubConv=null;}
     await signOut(auth);
     STATE={...STATE,currentUser:null,userProfile:null,posts:[],users:{},tab:'feed',postsLoading:true};
     render();
