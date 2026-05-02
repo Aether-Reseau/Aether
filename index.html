@@ -247,6 +247,7 @@ let STATE = {
 };
 let unsubPosts = null;
 let unsubConv = null; // Active conversation listener
+let unsubProfile = null; // Own profile real-time listener
 
 function setState(patch){ Object.assign(STATE,patch); render(); }
 
@@ -287,6 +288,21 @@ function subscribeToPosts(){
     STATE.posts=posts;
     STATE.postsLoading=false;
     render();
+  });
+}
+
+// Subscribe to own profile in real-time (follows, profile updates)
+function subscribeToProfile(uid){
+  if(unsubProfile) unsubProfile();
+  unsubProfile = onSnapshot(doc(db,'users',uid), snap=>{
+    if(snap.exists()){
+      const profile = {uid, ...snap.data()};
+      STATE.userProfile = profile;
+      STATE.users[uid] = profile;
+      // Keep currentUser followingIds in sync
+      STATE.currentUser = {...STATE.currentUser, followingIds: profile.followingIds||[], following: profile.following||0};
+      render();
+    }
   });
 }
 
@@ -736,10 +752,7 @@ function renderProfile(userProf,isMe,onBack){
           await updateDoc(myRef,  {following:increment(1),followingIds:arrayUnion(userProf.uid)});
           await updateDoc(theirRef,{followers:increment(1)});
         }
-        // Refresh own profile
-        const snap=await getDoc(doc(db,'users',STATE.currentUser.uid));
-        if(snap.exists()) STATE.userProfile={uid:STATE.currentUser.uid,...snap.data()};
-        // Refresh their profile in cache
+        // Refresh their profile in cache (own profile updated via onSnapshot)
         const tSnap=await getDoc(theirRef);
         if(tSnap.exists()) STATE.users[userProf.uid]={uid:userProf.uid,...tSnap.data()};
         render();
@@ -955,8 +968,8 @@ function renderExplore(){
           await updateDoc(myRef, {following:increment(1),followingIds:arrayUnion(u.uid)});
           await updateDoc(thRef, {followers:increment(1)});
         }
-        const [mySnap,thSnap]=await Promise.all([getDoc(myRef),getDoc(thRef)]);
-        if(mySnap.exists()) STATE.userProfile={uid:STATE.currentUser.uid,...mySnap.data()};
+        // Own profile updated via onSnapshot, just refresh theirs
+        const thSnap=await getDoc(thRef);
         if(thSnap.exists()) STATE.users[u.uid]={uid:u.uid,...thSnap.data()};
         render();
       }catch(e){console.error(e);}
@@ -1433,6 +1446,7 @@ function renderApp(){
   right.appendChild(btn({background:'none',border:'none',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:'#c5bfb8',padding:'0'},'Déco',async()=>{
     if(unsubPosts){unsubPosts();unsubPosts=null;}
     if(unsubConv){unsubConv();unsubConv=null;}
+    if(unsubProfile){unsubProfile();unsubProfile=null;}
     await signOut(auth);
     STATE={...STATE,currentUser:null,userProfile:null,posts:[],users:{},tab:'feed',postsLoading:true};
     render();
@@ -1551,6 +1565,12 @@ onAuthStateChanged(auth, async user=>{
       STATE.users[user.uid]=fallback;
     }
     subscribeToPosts();
+    subscribeToProfile(user.uid);
+    // Load all user profiles so Messages and Explore work immediately
+    getDocs(collection(db,'users')).then(snap=>{
+      snap.forEach(d=>{ STATE.users[d.id]={uid:d.id,...d.data()}; });
+      render();
+    }).catch(()=>{});
     render();
   } else {
     STATE.currentUser=null;
@@ -1558,6 +1578,7 @@ onAuthStateChanged(auth, async user=>{
     STATE.posts=[];
     STATE.postsLoading=true;
     if(unsubPosts){unsubPosts();unsubPosts=null;}
+    if(unsubProfile){unsubProfile();unsubProfile=null;}
     render();
   }
 });
