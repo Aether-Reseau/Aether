@@ -1523,7 +1523,36 @@ function renderAdmin(){
           });
           rolesBtns.appendChild(rb);
         });
-        r.appendChild(rolesBtns);
+        // Grade buttons
+        const currentGrade = u.grade || 'none';
+        const gradeBtns = div({display:'flex',gap:'4px',marginTop:'6px',flexWrap:'wrap'});
+        [['none','—'],['premium','💎'],['early_member','⭐'],['founder','👑']].forEach(([val,lbl])=>{
+          const isActive = currentGrade === val;
+          const gb = div({
+            padding:'3px 10px', borderRadius:'10px', cursor:'pointer',
+            fontFamily:"'DM Sans',sans-serif", fontSize:'11px',
+            color: isActive ? '#2a2420' : '#a09890',
+            background: isActive ? '#ede8e0' : 'transparent',
+            border: '1px solid ' + (isActive ? '#d5cfc8' : '#ede8e0'),
+            userSelect:'none'
+          }, [lbl]);
+          gb.addEventListener('click', async () => {
+            if(isActive) return;
+            const newGrade = val === 'none' ? null : val;
+            try {
+              await updateDoc(doc(db,'users',u.uid), {grade: newGrade});
+              STATE.users[u.uid] = {...u, grade: newGrade};
+              toast('Grade mis à jour');
+              render();
+            } catch(ex) { toast('Erreur : ' + ex.message, true); }
+          });
+          gradeBtns.appendChild(gb);
+        });
+
+        const actionsWrap = div({display:'flex',flexDirection:'column',gap:'4px',alignItems:'flex-end',flexShrink:0});
+        actionsWrap.appendChild(rolesBtns);
+        actionsWrap.appendChild(gradeBtns);
+        r.appendChild(actionsWrap);
       }
       content.appendChild(r);
     });
