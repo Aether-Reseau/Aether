@@ -1500,15 +1500,11 @@ function renderAdmin(){
     // All users with role badges
     const allFiltered=[...supers,...admins,...members];
     allFiltered.forEach(u=>{
-      const role=u.isSuperAdmin?'Super Admin':u.isAdmin?'Admin':'Membre';
-      const roleColor=u.isSuperAdmin?GOLD:u.isAdmin?ACCENT:MUTED;
       const r=div({display:'flex',gap:'12px',alignItems:'center',padding:'12px 0',borderBottom:'1px solid '+BDR});
       r.appendChild(Avatar(u,38));
       const inf=div({flex:1,minWidth:'0'});
       const nh=div({display:'flex',gap:'8px',alignItems:'center'});
       nh.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:TXT}},u.displayName||''));
-      nh.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'9px',color:roleColor,background:u.isSuperAdmin?'#fdf8e8':u.isAdmin?'#f0e8e0':'#f0ece8',padding:'2px 7px',borderRadius:'10px',fontWeight:600}},role));
-      const rgb=GradeBadge(u,true); if(rgb) nh.appendChild(rgb);
       inf.appendChild(nh);
       inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED,marginTop:'2px'}},'@'+(u.handle||'')));
       r.appendChild(inf);
