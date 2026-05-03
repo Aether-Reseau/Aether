@@ -1586,7 +1586,18 @@ function renderApp(){
   ]);
   hd.appendChild(logo);
   const right=div({display:'flex',gap:'10px',alignItems:'center'});
-  if(me.handle) right.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a09890'}},`@${me.handle}`));
+  // Loupe button — only on videos tab
+  if(tab==='videos'){
+    const loupeActive=STATE.videoSearchOpen;
+    const loupe=div({cursor:'pointer',fontSize:'16px',padding:'4px 6px',borderRadius:'8px',background:loupeActive?'#ede8e0':'transparent',color:loupeActive?'#2a2420':'#a09890',userSelect:'none'},'🔍');
+    loupe.addEventListener('click',()=>{
+      STATE.videoSearchOpen=!STATE.videoSearchOpen;
+      if(!STATE.videoSearchOpen) STATE.videoSearch='';
+      render();
+    });
+    right.appendChild(loupe);
+  }
+  if(me.handle) right.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a09890'}},'@'+me.handle));
   right.appendChild(btn({background:'none',border:'none',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:'#c5bfb8',padding:'0'},'Déco',async()=>{
     if(unsubPosts){unsubPosts();unsubPosts=null;}
     if(unsubConv){unsubConv();unsubConv=null;}
