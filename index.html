@@ -712,7 +712,10 @@ function renderFeed(){
       (post.comments||[]).forEach(c=>{
         const cu=getUserCached(c.userId)||{};
         const cd=div({marginBottom:'6px',display:'flex',gap:'8px'});
-        cd.appendChild(el('span',{style:{...S.sans(12,'#2a2420',600)}},cu.handle?`@${cu.handle}`:cu.displayName||'?'));
+        const cNameWrap=div({display:'flex',alignItems:'center',gap:'4px'});
+        cNameWrap.appendChild(el('span',{style:{...S.sans(12,'#2a2420',600)}},cu.handle?'@'+cu.handle:cu.displayName||'?'));
+        const cgb=GradeBadge(cu,true); if(cgb) cNameWrap.appendChild(cgb);
+        cd.appendChild(cNameWrap);
         cd.appendChild(el('span',{style:S.serif(13,'#5a504a')},c.text));
         cw.appendChild(cd);
       });
@@ -863,8 +866,11 @@ function renderProfile(userProf,isMe,onBack){
   root.appendChild(hd);
 
   const info=div({padding:'10px 16px 0'});
-  info.appendChild(el('div',{style:{...S.sans(19,'#2a2420',700)}},userProf.displayName||''));
-  if(userProf.handle) info.appendChild(el('div',{style:{...S.sans(13,'#a09890'),marginBottom:'4px'}},`@${userProf.handle}`));
+  const profNameRow=div({display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'2px'});
+  profNameRow.appendChild(el('div',{style:{...S.sans(19,'#2a2420',700)}},userProf.displayName||''));
+  const profgb=GradeBadge(userProf); if(profgb) profNameRow.appendChild(profgb);
+  info.appendChild(profNameRow);
+  if(userProf.handle) info.appendChild(el('div',{style:{...S.sans(13,'#a09890'),marginBottom:'4px'}},'@'+userProf.handle));
   if(userProf.bio) info.appendChild(p({...S.serif(13,'#5a504a'),lineHeight:1.6,marginBottom:'8px'},userProf.bio));
   const meta=div({display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'12px'});
   if(userProf.location) meta.appendChild(el('span',{style:S.sans(11,'#a09890')},`📍 ${userProf.location}`));
@@ -1200,6 +1206,7 @@ function renderMessages() {
     const nameRow = div({ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' });
     nameRow.appendChild(el('span', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: 600, color: '#2a2420' } }, u.displayName || ''));
     nameRow.appendChild(el('span', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#a09890' } }, '@' + (u.handle || '')));
+    const mlgb=GradeBadge(u,true); if(mlgb) nameRow.appendChild(mlgb);
     info.appendChild(nameRow);
     if (last) {
       const isMe = last.senderId === STATE.currentUser.uid;
@@ -1244,7 +1251,10 @@ function renderConversation(uid) {
   }));
   hd.appendChild(Avatar(u, 34));
   const hInfo = div({ flex: 1, minWidth: '0' });
-  hInfo.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: 600, color: '#2a2420' } }, u.displayName || ''));
+  const msgNameRow=div({display:'flex',alignItems:'center',gap:'6px'});
+  msgNameRow.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: 600, color: '#2a2420' } }, u.displayName || ''));
+  const mgb=GradeBadge(u,true); if(mgb) msgNameRow.appendChild(mgb);
+  hInfo.appendChild(msgNameRow);
   hInfo.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#a09890' } }, '@' + (u.handle || '')));
   hd.appendChild(hInfo);
   root.appendChild(hd);
@@ -1418,7 +1428,10 @@ function renderAdmin(){
       const r=div({display:'flex',gap:'12px',alignItems:'center',padding:'12px 0',borderBottom:'1px solid '+BDR});
       r.appendChild(Avatar(u,40));
       const inf=div({flex:1,minWidth:'0'});
-      inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:TXT}},u.displayName||''));
+      const admMNameRow=div({display:'flex',alignItems:'center',gap:'6px'});
+      admMNameRow.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:TXT}},u.displayName||''));
+      const admgb=GradeBadge(u,true); if(admgb) admMNameRow.appendChild(admgb);
+      inf.appendChild(admMNameRow);
       inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED}},'@'+(u.handle||'')+' · '+STATE.posts.filter(p=>p.userId===u.uid).length+' posts · '+(u.followers||0)+' abonnés'));
       r.appendChild(inf);
       const actions=div({display:'flex',gap:'6px'});
@@ -1495,6 +1508,7 @@ function renderAdmin(){
       const nh=div({display:'flex',gap:'8px',alignItems:'center'});
       nh.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:TXT}},u.displayName||''));
       nh.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'9px',color:roleColor,background:u.isSuperAdmin?'#fdf8e8':u.isAdmin?'#f0e8e0':'#f0ece8',padding:'2px 7px',borderRadius:'10px',fontWeight:600}},role));
+      const rgb=GradeBadge(u,true); if(rgb) nh.appendChild(rgb);
       inf.appendChild(nh);
       inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED,marginTop:'2px'}},'@'+(u.handle||'')));
       r.appendChild(inf);
