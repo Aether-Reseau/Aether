@@ -782,11 +782,18 @@ function renderVideos(){
   const me = STATE.userProfile||{};
 
   // Container — full height, black bg, no scroll
+  const maxH = isDesktop() ? 'calc(100vh - 57px)' : 'calc(100vh - 120px)';
+  const vidWidth = isDesktop() ? 'min(400px, 60%)' : '100%';
   const root = div({
-    position:'relative', background:'#000',
-    height: isDesktop() ? 'calc(100vh - 57px)' : 'calc(100vh - 120px)',
-    overflow:'hidden', userSelect:'none'
+    position:'relative', background:'#111',
+    height: maxH, overflow:'hidden', userSelect:'none',
+    display:'flex', alignItems:'center', justifyContent:'center'
   });
+
+  // Desktop: centered video with side panel
+  if(isDesktop()){
+    root.style.background='#0a0a0a';
+  }
 
   // Empty state
   if(!allVids.length){
@@ -806,13 +813,142 @@ function renderVideos(){
   const liked = (post.likedBy||[]).includes(STATE.currentUser.uid);
   const showComments = STATE.videoShowComments===post.id;
 
-  // ── Video ──
+  // ── Video container ──
+  const vidContainer = div({
+    position:'relative',
+    width: isDesktop()?'min(380px, 55vh * 9/16)':'100%',
+    height: isDesktop()?'min('+maxH+', 90%)':'100%',
+    flexShrink:0,
+    borderRadius: isDesktop()?'16px':'0',
+    overflow:'hidden',
+    background:'#000'
+  });
+
   const vid = el('video',{
     src: post.media.url, loop:true, playsInline:true, autoplay:true,
     style:{width:'100%',height:'100%',objectFit:'cover',display:'block'}
   });
   vid.muted = STATE.videoMuted!==false;
-  root.appendChild(vid);
+  vidContainer.appendChild(vid);
+
+  // On desktop, add video to a centered container
+  if(isDesktop()){
+    const vidWrap = div({
+      display:'flex', alignItems:'center', height:'100%',
+      gap:'24px', padding:'0 24px'
+    });
+    vidWrap.appendChild(vidContainer);
+
+    // Right info panel for desktop
+    const rightPanel = div({
+      width:'280px', flexShrink:0, display:'flex', flexDirection:'column',
+      justifyContent:'flex-end', paddingBottom:'20px', gap:'16px'
+    });
+
+    // Author info
+    const authorRow = div({display:'flex',alignItems:'center',gap:'10px',cursor:'pointer'});
+    authorRow.appendChild(Avatar(u,44));
+    const authorInfo = div({});
+    const aName=div({display:'flex',alignItems:'center',gap:'6px'});
+    aName.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'15px',fontWeight:700,color:'#fff'}},u.displayName||''));
+    const agb=GradeBadge(u,true); if(agb) aName.appendChild(agb);
+    authorInfo.appendChild(aName);
+    authorInfo.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'rgba(255,255,255,0.6)'}},'@'+(u.handle||'')));
+    authorRow.appendChild(authorInfo);
+    authorRow.addEventListener('click',()=>setState({profileUid:post.userId,tab:'profile'}));
+    rightPanel.appendChild(authorRow);
+
+    // Description
+    if(post.content){
+      const desc=document.createElement('p');
+      desc.style.cssText="font-family:'Lora',serif;font-size:14px;color:rgba(255,255,255,0.85);margin:0;line-height:1.6;";
+      desc.textContent=post.content;
+      rightPanel.appendChild(desc);
+    }
+
+    // Action buttons (desktop style — horizontal)
+    const deskActions=div({display:'flex',gap:'16px',alignItems:'center'});
+
+    // Like
+    const dLikeBtn=div({display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',padding:'8px 16px',background:'rgba(255,255,255,0.1)',borderRadius:'20px'});
+    dLikeBtn.appendChild(el('span',{style:{fontSize:'18px',color:liked?'#ff4d6d':'#fff'}},liked?'♥':'♡'));
+    dLikeBtn.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',color:'#fff',fontWeight:600}},String(post.likes||0)));
+    dLikeBtn.addEventListener('click',async()=>{
+      const ref=doc(db,'posts',post.id);
+      try{
+        if(liked) await updateDoc(ref,{likes:increment(-1),likedBy:arrayRemove(STATE.currentUser.uid)});
+        else await updateDoc(ref,{likes:increment(1),likedBy:arrayUnion(STATE.currentUser.uid)});
+      }catch(e){console.error(e);}
+    });
+    deskActions.appendChild(dLikeBtn);
+
+    // Comment
+    const dCmtBtn=div({display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',padding:'8px 16px',background:'rgba(255,255,255,0.1)',borderRadius:'20px'});
+    dCmtBtn.appendChild(el('span',{style:{fontSize:'16px',color:'#fff'}},'◯'));
+    dCmtBtn.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',color:'#fff',fontWeight:600}},String((post.comments||[]).length)));
+    dCmtBtn.addEventListener('click',()=>{STATE.videoShowComments=showComments?null:post.id;render();});
+    deskActions.appendChild(dCmtBtn);
+
+    // Mute
+    const dMuteBtn=div({cursor:'pointer',padding:'8px 14px',background:'rgba(255,255,255,0.1)',borderRadius:'20px',fontSize:'16px',color:'#fff'},STATE.videoMuted!==false?['🔇']:['🔊']);
+    dMuteBtn.addEventListener('click',()=>{STATE.videoMuted=STATE.videoMuted===false?true:false;render();});
+    deskActions.appendChild(dMuteBtn);
+
+    rightPanel.appendChild(deskActions);
+
+    // Comments section (desktop - inline below buttons)
+    if(showComments){
+      const dCmtSection=div({background:'rgba(255,255,255,0.05)',borderRadius:'12px',padding:'14px',maxHeight:'260px',display:'flex',flexDirection:'column'});
+      dCmtSection.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',fontWeight:600,color:'rgba(255,255,255,0.6)',marginBottom:'10px'}},String((post.comments||[]).length)+' commentaire'+(post.comments?.length!==1?'s':'')));
+      const cList=div({flex:1,overflowY:'auto',marginBottom:'10px'});
+      (post.comments||[]).forEach(c=>{
+        const cu=getUserCached(c.userId)||{};
+        const cd=div({display:'flex',gap:'8px',marginBottom:'8px'});
+        cd.appendChild(Avatar(cu,24));
+        const ct=div({});
+        ct.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.8)'}},(cu.handle?'@'+cu.handle:cu.displayName||'?')+' '));
+        ct.appendChild(el('span',{style:{fontFamily:"'Lora',serif",fontSize:'12px',color:'rgba(245,240,234,0.7)'}},c.text));
+        cd.appendChild(ct);
+        cList.appendChild(cd);
+      });
+      if(!(post.comments||[]).length) cList.appendChild(p({fontFamily:"'Lora',serif",fontSize:'12px',color:'rgba(255,255,255,0.3)',fontStyle:'italic'},'Aucun commentaire.'));
+      dCmtSection.appendChild(cList);
+      const dci=div({display:'flex',gap:'8px'});
+      const dcinp=el('input',{type:'text',placeholder:'Commenter...',value:STATE.videoCommentText||'',style:{flex:1,background:'rgba(255,255,255,0.1)',border:'none',borderRadius:'16px',padding:'6px 12px',fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#fff',outline:'none'}});
+      dcinp.addEventListener('input',e=>{STATE.videoCommentText=e.target.value;});
+      const dsendC=async()=>{
+        const t=STATE.videoCommentText?.trim(); if(!t)return;
+        try{ await updateDoc(doc(db,'posts',post.id),{comments:arrayUnion({userId:STATE.currentUser.uid,text:t,createdAt:new Date().toISOString()})}); STATE.videoCommentText=''; }catch(e){console.error(e);}
+      };
+      dcinp.addEventListener('keydown',e=>{if(e.key==='Enter')dsendC();});
+      dci.appendChild(dcinp);
+      dci.appendChild(btn({background:'#c17a4a',border:'none',borderRadius:'50%',width:'28px',height:'28px',cursor:'pointer',color:'#fff',fontSize:'13px',flexShrink:0},'↑',dsendC));
+      dCmtSection.appendChild(dci);
+      rightPanel.appendChild(dCmtSection);
+    }
+
+    // Nav arrows
+    const navRow=div({display:'flex',gap:'12px',alignItems:'center',justifyContent:'center'});
+    if(idx>0){
+      const pb=div({cursor:'pointer',padding:'8px 20px',background:'rgba(255,255,255,0.1)',borderRadius:'20px',color:'#fff',fontFamily:"'DM Sans',sans-serif",fontSize:'13px',userSelect:'none'},['↑ Précédente']);
+      pb.addEventListener('click',()=>setState({videoIndex:idx-1,videoShowComments:null}));
+      navRow.appendChild(pb);
+    }
+    if(idx<allVids.length-1){
+      const nb=div({cursor:'pointer',padding:'8px 20px',background:'rgba(255,255,255,0.1)',borderRadius:'20px',color:'#fff',fontFamily:"'DM Sans',sans-serif",fontSize:'13px',userSelect:'none'},['↓ Suivante']);
+      nb.addEventListener('click',()=>setState({videoIndex:idx+1,videoShowComments:null}));
+      navRow.appendChild(nb);
+    }
+    rightPanel.appendChild(navRow);
+
+    // Counter
+    rightPanel.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:'rgba(255,255,255,0.4)',textAlign:'center'}},String(idx+1)+' / '+String(allVids.length)));
+
+    vidWrap.appendChild(rightPanel);
+    root.appendChild(vidWrap);
+  } else {
+    root.appendChild(vidContainer);
+  }
 
   // Play/pause on tap (center area)
   let tapTimer;
@@ -827,6 +963,8 @@ function renderVideos(){
     tapTimer=setTimeout(()=>pi.remove(),700);
   });
 
+  // On mobile only: add overlays to root (they position:absolute over the video)
+  if(!isDesktop()){
   // ── Gradient overlay ──
   root.appendChild(div({
     position:'absolute', inset:'0', pointerEvents:'none',
@@ -917,6 +1055,8 @@ function renderVideos(){
     background:'rgba(0,0,0,0.4)',borderRadius:'12px',padding:'3px 10px',zIndex:10,
     fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:'rgba(255,255,255,0.8)'
   },[String(idx+1)+' / '+String(allVids.length)]));
+
+  } // end if(!isDesktop()) mobile overlays
 
   // ── Swipe / scroll navigation ──
   let touchStartY=0, touchStartX=0;
@@ -1555,23 +1695,24 @@ function renderAdmin(){
     ? [['overview',"Vue d'ensemble",'◈'],['members','Membres','◎'],['admins','Admins','⬡'],['posts','Publications','≡'],['roles','Rôles','◇']]
     : [['overview',"Vue d'ensemble",'◈'],['members','Membres','◎'],['posts','Publications','≡']];
 
-  const tabs = div({display:'flex',borderBottom:'1px solid '+BDR});
+  const tabs = div({display:'flex',borderBottom:'1px solid '+BDR,overflowX:'auto'});
   tabDefs.forEach(([id,label,icon])=>{
     const active=sec===id;
     const isGold=isSuperAdmin&&id==='roles';
     const activeColor=isGold?GOLD:ACCENT;
-    const tabItem=div({
-      flex:'1',minWidth:'55px',cursor:'pointer',padding:'12px 4px',
-      display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',
-      borderBottom:'2px solid '+(active?activeColor:'transparent'),
-      userSelect:'none'
-    });
-    const iconEl=el('span',{style:{fontSize:'14px',color:active?activeColor:MUTED}},icon);
-    const labelEl=el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'8px',textTransform:'uppercase',letterSpacing:'0.08em',color:active?activeColor:MUTED,whiteSpace:'nowrap'}},label);
-    tabItem.appendChild(iconEl);
-    tabItem.appendChild(labelEl);
-    tabItem.addEventListener('click',()=>{ STATE.adminSection=id; render(); });
-    tabs.appendChild(tabItem);
+    const tabBtn=document.createElement('button');
+    tabBtn.type='button';
+    tabBtn.style.cssText='flex:1;min-width:70px;background:none;border:none;border-bottom:2px solid '+(active?activeColor:'transparent')+';cursor:pointer;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;outline:none;';
+    const iconEl=document.createElement('span');
+    iconEl.textContent=icon;
+    iconEl.style.cssText='font-size:15px;color:'+(active?activeColor:MUTED)+';';
+    const labelEl=document.createElement('span');
+    labelEl.textContent=label;
+    labelEl.style.cssText="font-family:'DM Sans',sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:"+(active?activeColor:MUTED)+";white-space:nowrap;";
+    tabBtn.appendChild(iconEl);
+    tabBtn.appendChild(labelEl);
+    tabBtn.onclick=()=>{ STATE.adminSection=id; render(); };
+    tabs.appendChild(tabBtn);
   });
   root.appendChild(tabs);
 
