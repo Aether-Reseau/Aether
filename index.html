@@ -2024,66 +2024,63 @@ function isDesktop(){ return window.innerWidth >= 768; }
 
 // ── Desktop app shell ─────────────────────────────────────────────
 function renderDesktop(){
-  const me = STATE.userProfile || {};
+  const me  = STATE.userProfile || {};
   const { tab, profileUid, editing } = STATE;
+  const isAdmin = tab === 'admin';
+  const isVideo = tab === 'videos';
 
-  const layout = div({ display:'flex', height:'100vh', background:'#ede8e0', id:'desktop-layout' });
+  const layout = div({ display:'flex', height:'100vh', background:'#ede8e0', overflow:'hidden' });
 
-  // ── Left sidebar (nav) ──
+  // ══ SIDEBAR ══════════════════════════════════════════════════
   const sidebar = div({
     width:'220px', flexShrink:0, background:'#faf7f3',
     borderRight:'1px solid #ede8e0', display:'flex',
-    flexDirection:'column', padding:'24px 0', height:'100vh',
-    position:'sticky', top:0
+    flexDirection:'column', height:'100vh', overflow:'hidden'
   });
 
-  // Logo
-  const logoWrap = div({ padding:'0 24px 28px', borderBottom:'1px solid #ede8e0', marginBottom:'12px' });
-  logoWrap.appendChild(el('div',{style:{fontFamily:"'Lora',serif",fontWeight:500,fontSize:'26px',color:'#2a2420',letterSpacing:'-0.02em'}},'Æther'));
+  const logoWrap = div({ padding:'20px 24px 20px', borderBottom:'1px solid #ede8e0' });
+  logoWrap.appendChild(el('div',{style:{fontFamily:"'Lora',serif",fontWeight:500,fontSize:'26px",color:"#2a2420',letterSpacing:'-0.02em'}},'Æther'));
   logoWrap.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'9px',color:'#c5bfb8',textTransform:'uppercase',letterSpacing:'0.16em',marginTop:'2px'}},'réseau social'));
   sidebar.appendChild(logoWrap);
 
-  // Nav items
   const NAV_ITEMS = [
-    {id:'feed',    label:'Fil',       icon:'≡'},
-    {id:'explore', label:'Explorer',  icon:'◎'},
-    {id:'videos',  label:'Vidéos',    icon:'▶'},
-    {id:'messages',label:'Messages',  icon:'◇'},
-    {id:'me',      label:'Mon profil',icon:'○'},
-    ...((me.isAdmin||me.isSuperAdmin)?[{id:'admin', label:me.isSuperAdmin?'Super Admin':'Admin', icon:me.isSuperAdmin?'★':'◈'}]:[]),
+    {id:'feed',    label:'Fil',        icon:'≡'},
+    {id:'explore', label:'Explorer',   icon:'◎'},
+    {id:'videos',  label:'Vidéos',     icon:'▶'},
+    {id:'messages',label:'Messages',   icon:'◇'},
+    {id:'me',      label:'Mon profil', icon:'○'},
+    ...((me.isAdmin||me.isSuperAdmin)?[{id:'admin',label:me.isSuperAdmin?'Super Admin':'Admin',icon:me.isSuperAdmin?'★':'◈'}]:[]),
   ];
 
-  const navList = div({ padding:'0 12px', flex:1 });
+  const navList = div({ padding:'8px 12px', flex:1, overflowY:'auto' });
   NAV_ITEMS.forEach(item => {
     const active = tab===item.id || (tab==='profile'&&item.id==='explore');
     const isAdminItem = item.id==='admin';
-    const navItem = div({
-      display:'flex', alignItems:'center', gap:'12px',
-      padding:'10px 14px', borderRadius:'12px', cursor:'pointer',
-      background: active ? '#f0ebe4' : 'transparent',
-      marginBottom:'2px', userSelect:'none',
-      transition:'background 0.15s'
-    });
-    navItem.onmouseenter = ()=>{ if(!active) navItem.style.background='#f5f0ea'; };
-    navItem.onmouseleave = ()=>{ if(!active) navItem.style.background='transparent'; };
-    navItem.appendChild(el('span',{style:{
-      fontSize:'18px',
-      color: active?(isAdminItem?(me.isSuperAdmin?'#b8860b':'#c17a4a'):'#2a2420'):(isAdminItem?'#c17a4a':'#a09890')
-    }},item.icon));
-    navItem.appendChild(el('span',{style:{
-      fontFamily:"'DM Sans',sans-serif", fontSize:'14px', fontWeight: active?600:400,
-      color: active?(isAdminItem?(me.isSuperAdmin?'#b8860b':'#c17a4a'):'#2a2420'):(isAdminItem?'#c17a4a':'#a09890')
-    }},item.label));
-    navItem.addEventListener('click',()=>{ STATE.editing=false; STATE.editForm=null; if(item.id==='videos'){STATE.videoIndex=0;STATE.videoShowComments=null;} setState({tab:item.id}); });
-    navList.appendChild(navItem);
+    const accentColor = me.isSuperAdmin?'#b8860b':'#c17a4a';
+    const navBtn = document.createElement('button');
+    navBtn.type = 'button';
+    navBtn.style.cssText = 'width:100%;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;border:none;cursor:pointer;background:'+(active?'#f0ebe4':'transparent')+';margin-bottom:2px;text-align:left;';
+    navBtn.onmouseenter = ()=>{ if(!active) navBtn.style.background='#f5f0ea'; };
+    navBtn.onmouseleave = ()=>{ if(!active) navBtn.style.background='transparent'; };
+    const iconSpan = document.createElement('span');
+    iconSpan.textContent = item.icon;
+    iconSpan.style.cssText = 'font-size:18px;color:'+(active?(isAdminItem?accentColor:'#2a2420'):(isAdminItem?accentColor:'#a09890'))+';';
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = item.label;
+    labelSpan.style.cssText = "font-family:'DM Sans',sans-serif;font-size:14px;font-weight:"+(active?600:400)+";color:"+(active?(isAdminItem?accentColor:'#2a2420'):(isAdminItem?accentColor:'#a09890'))+";";
+    navBtn.appendChild(iconSpan);
+    navBtn.appendChild(labelSpan);
+    navBtn.onclick = ()=>{
+      STATE.editing=false; STATE.editForm=null;
+      if(item.id==='videos'){STATE.videoIndex=0;STATE.videoShowComments=null;}
+      setState({tab:item.id});
+    };
+    navList.appendChild(navBtn);
   });
   sidebar.appendChild(navList);
 
-  // User profile at bottom of sidebar
-  const userCard = div({
-    margin:'12px', padding:'12px', borderRadius:'12px',
-    background:'#f0ebe4', display:'flex', alignItems:'center', gap:'10px'
-  });
+  // User card bottom
+  const userCard = div({ margin:'12px', padding:'12px', borderRadius:'12px', background:'#f0ebe4', display:'flex', alignItems:'center', gap:'10px' });
   userCard.appendChild(Avatar(me, 36));
   const ucInfo = div({ flex:1, minWidth:0 });
   const ucName = div({ display:'flex', alignItems:'center', gap:'6px' });
@@ -2092,42 +2089,52 @@ function renderDesktop(){
   ucInfo.appendChild(ucName);
   if(me.handle) ucInfo.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:'#a09890'}},'@'+me.handle));
   userCard.appendChild(ucInfo);
-  userCard.appendChild(btn({background:'none',border:'none',cursor:'pointer',color:'#c5bfb8',fontSize:'13px',padding:'4px',flexShrink:0},'⇥',async()=>{
+  const logoutBtn = document.createElement('button');
+  logoutBtn.type='button'; logoutBtn.textContent='⇥';
+  logoutBtn.style.cssText='background:none;border:none;cursor:pointer;color:#c5bfb8;font-size:16px;padding:4px;flex-shrink:0;';
+  logoutBtn.title='Déconnexion';
+  logoutBtn.onclick = async()=>{
     if(unsubPosts){unsubPosts();unsubPosts=null;}
     if(unsubConv){unsubConv();unsubConv=null;}
     if(unsubProfile){unsubProfile();unsubProfile=null;}
     await signOut(auth);
     STATE={...STATE,currentUser:null,userProfile:null,posts:[],users:{},tab:'feed',postsLoading:true};
     render();
-  }));
+  };
+  userCard.appendChild(logoutBtn);
   sidebar.appendChild(userCard);
   layout.appendChild(sidebar);
 
-  // ── Main content ──
-  const main = div({
+  // ══ CENTER — full width for admin/video, normal otherwise ══
+  const centerWidth = (isAdmin||isVideo) ? '1fr' : 'minmax(0,640px)';
+  const showRight = !isAdmin && !isVideo;
+
+  const center = div({
     flex:1, height:'100vh', overflowY:'auto',
-    maxWidth:'640px', background:'#faf7f3',
-    borderRight:'1px solid #ede8e0'
+    background: isVideo?'#000':'#faf7f3',
+    borderRight: showRight?'1px solid #ede8e0':'none',
+    display:'flex', flexDirection:'column'
   });
 
-  // Main header
-  const mainHd = div({
-    padding:'16px 24px', borderBottom:'1px solid #ede8e0',
-    display:'flex', alignItems:'center', justifyContent:'space-between',
-    position:'sticky', top:0, background:'#faf7f3', zIndex:10
-  });
-  const tabTitles = {feed:"Fil d'actualité",explore:'Explorer',videos:'Vidéos',messages:'Messages',me:'Mon profil',admin:'Administration',profile:'Profil'};
-  mainHd.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'16px',fontWeight:600,color:'#2a2420'}},tabTitles[tab]||'Æther'));
-  if(tab==='videos'){
-    const loupeActive=STATE.videoSearchOpen;
-    const loupe=div({cursor:'pointer',fontSize:'16px',padding:'4px 8px',borderRadius:'8px',background:loupeActive?'#ede8e0':'transparent',color:loupeActive?'#2a2420':'#a09890',userSelect:'none'},'🔍');
-    loupe.addEventListener('click',()=>{ STATE.videoSearchOpen=!STATE.videoSearchOpen; if(!STATE.videoSearchOpen) STATE.videoSearch=''; render(); });
-    mainHd.appendChild(loupe);
+  // Center header
+  if(!isVideo){
+    const mainHd = div({ padding:'16px 24px', borderBottom:'1px solid #ede8e0', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, background:'#faf7f3', zIndex:5, flexShrink:0 });
+    const titles = {feed:"Fil d'actualité",explore:'Explorer',messages:'Messages',me:'Mon profil',admin:'Administration',profile:'Profil'};
+    mainHd.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'16px',fontWeight:600,color:'#2a2420'}},titles[tab]||'Æther'));
+    center.appendChild(mainHd);
+  } else {
+    // Loupe for videos
+    const vidHd=div({padding:'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'absolute',top:0,left:0,right:0,zIndex:20,pointerEvents:'none'});
+    const loupeBtn=document.createElement('button');
+    loupeBtn.type='button'; loupeBtn.textContent='🔍';
+    loupeBtn.style.cssText='background:rgba(0,0,0,0.4);border:none;border-radius:20px;padding:6px 12px;cursor:pointer;font-size:16px;color:#fff;pointer-events:all;';
+    loupeBtn.onclick=()=>{ STATE.videoSearchOpen=!STATE.videoSearchOpen; if(!STATE.videoSearchOpen) STATE.videoSearch=''; render(); };
+    vidHd.appendChild(loupeBtn);
+    center.appendChild(vidHd);
   }
-  main.appendChild(mainHd);
 
   // Content
-  const contentWrap = div({ paddingBottom:'24px' });
+  const contentWrap = div({ flex:1 });
   if(tab==='feed')           contentWrap.appendChild(renderFeed());
   else if(tab==='explore')   contentWrap.appendChild(renderExplore());
   else if(tab==='videos')    contentWrap.appendChild(renderVideos());
@@ -2140,58 +2147,47 @@ function renderDesktop(){
     if(u) contentWrap.appendChild(renderProfile(u,false,()=>setState({tab:'explore',profileUid:null})));
     else{ contentWrap.appendChild(Spinner()); fetchUserProfile(profileUid).then(()=>render()); }
   }
-  main.appendChild(contentWrap);
-  layout.appendChild(main);
+  center.appendChild(contentWrap);
+  layout.appendChild(center);
 
-  // ── Right panel (suggestions + stats) ──
-  const right = div({
-    width:'300px', flexShrink:0, padding:'24px 20px',
-    height:'100vh', overflowY:'auto'
-  });
+  // ══ RIGHT PANEL — only on non-admin, non-video tabs ══
+  if(showRight){
+    const right = div({ width:'300px', flexShrink:0, padding:'20px', height:'100vh', overflowY:'auto', background:'#ede8e0' });
 
-  // Search box
-  const srchBox = div({ background:'#faf7f3', borderRadius:'20px', padding:'10px 16px', display:'flex', gap:'8px', alignItems:'center', marginBottom:'20px' });
-  srchBox.appendChild(el('span',{style:{color:'#a09890',fontSize:'14px'}},'🔍'));
-  const srchInp = el('input',{type:'text',placeholder:'Rechercher...',style:{border:'none',outline:'none',background:'transparent',fontFamily:"'DM Sans',sans-serif",fontSize:'13px',color:'#2a2420',flex:1,width:'100%'}});
-  srchInp.addEventListener('input',e=>{
-    STATE.exploreSearch=e.target.value;
-    filterExplore(null, suggestList, STATE.userProfile||{});
-  });
-  srchBox.appendChild(srchInp);
-  right.appendChild(srchBox);
+    const srchBox = div({ background:'#faf7f3', borderRadius:'20px', padding:'10px 16px', display:'flex', gap:'8px', alignItems:'center', marginBottom:'20px' });
+    srchBox.appendChild(el('span',{style:{color:'#a09890',fontSize:'14px'}},'🔍'));
+    const srchInp = el('input',{type:'text',placeholder:'Rechercher...',style:{border:'none',outline:'none',background:'transparent',fontFamily:"'DM Sans',sans-serif",fontSize:'13px',color:'#2a2420',flex:1,width:'100%'}});
+    srchInp.addEventListener('input',e=>{ STATE.exploreSearch=e.target.value; filterExplore(null,suggestList,STATE.userProfile||{}); });
+    srchBox.appendChild(srchInp);
+    right.appendChild(srchBox);
 
-  // Suggested profiles
-  right.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',fontWeight:600,color:'#a09890',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'12px'}},'Suggestions'));
-  const suggestList = div({});
-  const me2 = STATE.userProfile||{};
-  const suggestions = Object.values(STATE.users).filter(u=>{
-    if(u.uid===STATE.currentUser?.uid||!u.handle) return false;
-    if((me2.exploreSearch||'')) return (u.handle||'').toLowerCase().includes((STATE.exploreSearch||'').toLowerCase())||(u.displayName||'').toLowerCase().includes((STATE.exploreSearch||'').toLowerCase());
-    return !(me2.followingIds||[]).includes(u.uid);
-  }).slice(0,6);
-  buildSuggestions(suggestList, suggestions, me2);
-  right.appendChild(suggestList);
+    right.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:'#a09890',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'12px'}},'Suggestions'));
+    const suggestList = div({});
+    const suggestions = Object.values(STATE.users).filter(u=>{
+      if(u.uid===STATE.currentUser?.uid||!u.handle) return false;
+      return !(me.followingIds||[]).includes(u.uid);
+    }).slice(0,6);
+    buildSuggestions(suggestList, suggestions, me);
+    right.appendChild(suggestList);
 
-  // Stats widget
-  const statsBox = div({ background:'#faf7f3', borderRadius:'12px', padding:'16px', marginTop:'20px' });
-  statsBox.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',fontWeight:600,color:'#a09890',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'12px'}},'Statistiques'));
-  const totalPosts = STATE.posts.length;
-  const totalUsers = Object.values(STATE.users).filter(u=>!u.isAdmin&&!u.isSuperAdmin).length;
-  [['Publications',totalPosts,'≡'],['Membres',totalUsers,'◎']].forEach(([l,v,ic])=>{
-    const row = div({ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid #ede8e0' });
-    row.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a09890'}},ic+' '+l));
-    row.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:'#2a2420'}},String(v)));
-    statsBox.appendChild(row);
-  });
-  right.appendChild(statsBox);
+    const statsBox = div({ background:'#faf7f3', borderRadius:'12px', padding:'16px', marginTop:'20px' });
+    statsBox.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:'#a09890',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'12px'}},'Statistiques'));
+    [['Publications',STATE.posts.length,'≡'],['Membres',Object.values(STATE.users).filter(u=>!u.isAdmin&&!u.isSuperAdmin).length,'◎']].forEach(([l,v,ic])=>{
+      const row = div({ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid #ede8e0' });
+      row.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a09890'}},ic+' '+l));
+      row.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:'#2a2420'}},String(v)));
+      statsBox.appendChild(row);
+    });
+    right.appendChild(statsBox);
+    layout.appendChild(right);
+  }
 
   // Toast
   if(STATE.toast){
-    const t=div({position:'fixed',bottom:'24px',left:'50%',transform:'translateX(-50%)',background:STATE.toast.isErr?'#8a2010':'#2a2420',color:'#f5f0ea',padding:'10px 20px',borderRadius:'20px',fontFamily:"'DM Sans',sans-serif",fontSize:'13px',zIndex:50,whiteSpace:'nowrap',animation:'fadeIn 0.3s ease'},[STATE.toast.msg]);
+    const t=div({position:'fixed',bottom:'24px',left:'50%',transform:'translateX(-50%)',background:STATE.toast.isErr?'#8a2010':'#2a2420',color:'#f5f0ea',padding:'10px 20px',borderRadius:'20px',fontFamily:"'DM Sans',sans-serif",fontSize:'13px',zIndex:999,whiteSpace:'nowrap',animation:'fadeIn 0.3s ease'},[STATE.toast.msg]);
     layout.appendChild(t);
   }
 
-  layout.appendChild(right);
   return layout;
 }
 
