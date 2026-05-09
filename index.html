@@ -1761,12 +1761,20 @@ function renderAdmin(){
       r.appendChild(inf);
       const actions=div({display:'flex',gap:'6px'});
       if(isSuperAdmin){
-        actions.appendChild(btn({background:'none',border:'1px solid '+BDR,padding:'4px 10px',borderRadius:'12px',fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:MUTED,cursor:'pointer',flexShrink:0},'→ Admin',async()=>{
+        const promoteBtn=document.createElement('button');
+        promoteBtn.type='button'; promoteBtn.textContent='→ Admin';
+        promoteBtn.style.cssText='background:none;border:1px solid '+BDR+';padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+MUTED+';cursor:pointer;flex-shrink:0;';
+        promoteBtn.onclick=async()=>{
           try{await updateDoc(doc(db,'users',u.uid),{isAdmin:true});}catch(e){toast('Erreur',true);}
           STATE.users[u.uid]={...u,isAdmin:true};render();
-        }));
+        };
+        actions.appendChild(promoteBtn);
       }
-      actions.appendChild(btn({background:'none',border:'1px solid #e0c0c0',padding:'4px 10px',borderRadius:'12px',fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:DANGER,cursor:'pointer',flexShrink:0},'Supprimer',()=>setState({adminConfirm:{type:'user',uid:u.uid,name:u.displayName||u.handle||'?'}})));
+      const delABtn=document.createElement('button');
+      delABtn.type='button';delABtn.textContent='Supprimer';
+      delABtn.style.cssText='background:none;border:1px solid #e0c0c0;padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+DANGER+';cursor:pointer;flex-shrink:0;';
+      delABtn.onclick=()=>setState({adminConfirm:{type:'user',uid:u.uid,name:u.displayName||u.handle||'?'}});
+      actions.appendChild(delABtn);
       r.appendChild(actions);
       content.appendChild(r);
     });
@@ -1784,11 +1792,19 @@ function renderAdmin(){
       inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED}},'@'+(u.handle||'')+' · Admin'));
       r.appendChild(inf);
       const actions=div({display:'flex',gap:'6px'});
-      actions.appendChild(btn({background:'none',border:'1px solid '+BDR,padding:'4px 10px',borderRadius:'12px',fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:MUTED,cursor:'pointer',flexShrink:0},'Rétrograder',async()=>{
+      const degradeBtn=document.createElement('button');
+      degradeBtn.type='button'; degradeBtn.textContent='Rétrograder';
+      degradeBtn.style.cssText='background:none;border:1px solid '+BDR+';padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+MUTED+';cursor:pointer;flex-shrink:0;';
+      degradeBtn.onclick=async()=>{
         try{await updateDoc(doc(db,'users',u.uid),{isAdmin:false});}catch(e){toast('Erreur',true);}
         STATE.users[u.uid]={...u,isAdmin:false};render();
-      }));
-      actions.appendChild(btn({background:'none',border:'1px solid #e0c0c0',padding:'4px 10px',borderRadius:'12px',fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:DANGER,cursor:'pointer',flexShrink:0},'Supprimer',()=>setState({adminConfirm:{type:'user',uid:u.uid,name:u.displayName||u.handle||'?'}})));
+      };
+      actions.appendChild(degradeBtn);
+      const delABtn=document.createElement('button');
+      delABtn.type='button';delABtn.textContent='Supprimer';
+      delABtn.style.cssText='background:none;border:1px solid #e0c0c0;padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+DANGER+';cursor:pointer;flex-shrink:0;';
+      delABtn.onclick=()=>setState({adminConfirm:{type:'user',uid:u.uid,name:u.displayName||u.handle||'?'}});
+      actions.appendChild(delABtn);
       r.appendChild(actions);
       content.appendChild(r);
     });
@@ -1811,7 +1827,11 @@ function renderAdmin(){
       if(post.media) inf.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:MUTED}},post.media.type==='image'?'🖼 Image':'▶ Vidéo'));
       inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:MUTED,marginTop:'3px'}},'♡ '+(post.likes||0)+' · ◯ '+(post.comments||[]).length));
       r.appendChild(inf);
-      r.appendChild(btn({background:'none',border:'1px solid #e0c0c0',padding:'4px 10px',borderRadius:'10px',fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:DANGER,cursor:'pointer',flexShrink:0},'✕',()=>setState({adminConfirm:{type:'post',id:post.id,name:(post.content||'(média)').slice(0,30)+'…'}})));
+      const delPBtn2=document.createElement('button');
+      delPBtn2.type='button'; delPBtn2.textContent='✕';
+      delPBtn2.style.cssText='background:none;border:1px solid #e0c0c0;padding:4px 10px;border-radius:10px;font-family:"DM Sans",sans-serif;font-size:11px;color:'+DANGER+';cursor:pointer;flex-shrink:0;';
+      delPBtn2.onclick=()=>setState({adminConfirm:{type:'post',id:post.id,name:(post.content||'(média)').slice(0,30)+'…'}});
+      r.appendChild(delPBtn2);
       content.appendChild(r);
     });
   }
@@ -1838,15 +1858,10 @@ function renderAdmin(){
         const rolesBtns = div({display:'flex',gap:'4px',flexShrink:0});
         [['member','Membre'],['admin','Admin'],['superAdmin','Super']].forEach(([val,lbl])=>{
           const isActive = currentRole===val;
-          const rb = div({
-            padding:'4px 10px', borderRadius:'12px', cursor:'pointer',
-            fontFamily:"'DM Sans',sans-serif", fontSize:'10px', fontWeight: isActive?600:400,
-            color: isActive?(val==='superAdmin'?GOLD:val==='admin'?ACCENT:TXT):MUTED,
-            background: isActive?(val==='superAdmin'?'#fdf8e8':val==='admin'?'#f0e8e0':'#ede8e0'):'transparent',
-            border:'1px solid '+(isActive?(val==='superAdmin'?GOLD:val==='admin'?ACCENT:BDR):BDR),
-            userSelect:'none'
-          }, [lbl]);
-          rb.addEventListener('click', async ()=>{
+          const rb = document.createElement('button');
+          rb.type='button'; rb.textContent=lbl;
+          rb.style.cssText='padding:4px 10px;border-radius:12px;cursor:pointer;font-family:"DM Sans",sans-serif;font-size:10px;font-weight:'+(isActive?600:400)+';color:'+(isActive?(val==='superAdmin'?GOLD:val==='admin'?ACCENT:TXT):MUTED)+';background:'+(isActive?(val==='superAdmin'?'#fdf8e8':val==='admin'?'#f0e8e0':'#ede8e0'):'transparent')+';border:1px solid '+(isActive?(val==='superAdmin'?GOLD:val==='admin'?ACCENT:BDR):BDR)+';';
+          rb.onclick = async ()=>{
             if(isActive) return;
             const upd={isAdmin:val==='admin'||val==='superAdmin', isSuperAdmin:val==='superAdmin'};
             try{
@@ -1855,7 +1870,7 @@ function renderAdmin(){
               toast('Rôle mis à jour');
               render();
             }catch(ex){ toast('Erreur : '+ex.message, true); }
-          });
+          };
           rolesBtns.appendChild(rb);
         });
         // Grade buttons
@@ -1863,15 +1878,10 @@ function renderAdmin(){
         const gradeBtns = div({display:'flex',gap:'4px',marginTop:'6px',flexWrap:'wrap'});
         [['none','—'],['premium','💎'],['early_member','⭐'],['founder','👑']].forEach(([val,lbl])=>{
           const isActive = currentGrade === val;
-          const gb = div({
-            padding:'3px 10px', borderRadius:'10px', cursor:'pointer',
-            fontFamily:"'DM Sans',sans-serif", fontSize:'11px',
-            color: isActive ? '#2a2420' : '#a09890',
-            background: isActive ? '#ede8e0' : 'transparent',
-            border: '1px solid ' + (isActive ? '#d5cfc8' : '#ede8e0'),
-            userSelect:'none'
-          }, [lbl]);
-          gb.addEventListener('click', async () => {
+          const gb = document.createElement('button');
+          gb.type='button'; gb.textContent=lbl;
+          gb.style.cssText='padding:3px 10px;border-radius:10px;cursor:pointer;font-family:"DM Sans",sans-serif;font-size:11px;color:'+(isActive?'#2a2420':'#a09890')+';background:'+(isActive?'#ede8e0':'transparent')+';border:1px solid '+(isActive?'#d5cfc8':'#ede8e0')+';';
+          gb.onclick = async () => {
             if(isActive) return;
             const newGrade = val === 'none' ? null : val;
             try {
@@ -1880,7 +1890,7 @@ function renderAdmin(){
               toast('Grade mis à jour');
               render();
             } catch(ex) { toast('Erreur : ' + ex.message, true); }
-          });
+          };
           gradeBtns.appendChild(gb);
         });
 
@@ -1905,8 +1915,13 @@ function renderAdmin(){
     msg.innerHTML='Supprimer '+(conf.type==='user'?'le compte':'la publication')+' <strong style="color:'+TXT+'">« '+conf.name+' »</strong> ?'+(conf.type==='user'?' Ses publications seront aussi supprimées.':'');
     modal.appendChild(msg);
     const mbtns=div({display:'flex',gap:'10px'});
-    mbtns.appendChild(btn({flex:1,background:'none',border:'1px solid '+BDR,padding:'11px',fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:MUTED,cursor:'pointer',borderRadius:'2px'},'Annuler',()=>setState({adminConfirm:null})));
-    mbtns.appendChild(btn({flex:1,background:DANGER,border:'none',padding:'11px',fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#fff',cursor:'pointer',borderRadius:'2px',fontWeight:600},'Supprimer',async()=>{
+    const cancelB=document.createElement('button');cancelB.type='button';cancelB.textContent='Annuler';
+  cancelB.style.cssText='flex:1;background:none;border:1px solid '+BDR+';padding:11px;font-family:"DM Sans",sans-serif;font-size:12px;color:'+MUTED+';cursor:pointer;border-radius:2px;';
+  cancelB.onclick=()=>setState({adminConfirm:null});
+  mbtns.appendChild(cancelB);
+    const deleteB=document.createElement('button');deleteB.type='button';deleteB.textContent='Supprimer';
+  deleteB.style.cssText='flex:1;background:'+DANGER+';border:none;padding:11px;font-family:"DM Sans",sans-serif;font-size:12px;color:#fff;cursor:pointer;border-radius:2px;font-weight:600;';
+  deleteB.onclick=async()=>{
       if(conf.type==='post'){
         try{await deleteDoc(doc(db,'posts',conf.id));}catch(e){console.error(e);}
         setState({adminConfirm:null});
@@ -1919,7 +1934,8 @@ function renderAdmin(){
         }catch(e){console.error(e);}
         setState({adminConfirm:null});
       }
-    }));
+    };
+    mbtns.appendChild(deleteB);
     modal.appendChild(mbtns);
     overlay.appendChild(modal);
     root.appendChild(overlay);
@@ -2033,7 +2049,7 @@ function renderDesktop(){
 
   // ══ SIDEBAR ══════════════════════════════════════════════════
   const sidebar = div({
-    width:'220px', flexShrink:0, background:'#faf7f3',
+    width:'240px', flexShrink:0, background:'#faf7f3',
     borderRight:'1px solid #ede8e0', display:'flex',
     flexDirection:'column', height:'100vh', overflow:'hidden'
   });
@@ -2110,10 +2126,11 @@ function renderDesktop(){
   const showRight = !isAdmin && !isVideo;
 
   const center = div({
-    flex:1, height:'100vh', overflowY:'auto',
+    flex:1, minWidth:0, height:'100vh', overflowY:'auto',
     background: isVideo?'#000':'#faf7f3',
     borderRight: showRight?'1px solid #ede8e0':'none',
-    display:'flex', flexDirection:'column'
+    display:'flex', flexDirection:'column',
+    position:'relative'
   });
 
   // Center header
@@ -2152,7 +2169,7 @@ function renderDesktop(){
 
   // ══ RIGHT PANEL — only on non-admin, non-video tabs ══
   if(showRight){
-    const right = div({ width:'300px', flexShrink:0, padding:'20px', height:'100vh', overflowY:'auto', background:'#ede8e0' });
+    const right = div({ width:'280px', flexShrink:0, padding:'16px', height:'100vh', overflowY:'auto', background:'#ede8e0' });
 
     const srchBox = div({ background:'#faf7f3', borderRadius:'20px', padding:'10px 16px', display:'flex', gap:'8px', alignItems:'center', marginBottom:'20px' });
     srchBox.appendChild(el('span',{style:{color:'#a09890',fontSize:'14px'}},'🔍'));
