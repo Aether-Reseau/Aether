@@ -681,10 +681,12 @@ function renderFeed(){
 
     if(post.content) pc.appendChild(p({...S.serif(15,'#3a3430'),margin:'0 0 10px'},post.content));
     if(post.media?.url){
-      const mw=div({marginBottom:'10px',borderRadius:'8px',overflow:'hidden'});
-      mw.appendChild(post.media.type==='image'
-        ?el('img',{src:post.media.url,style:{width:'100%',maxHeight:'360px',objectFit:'cover',display:'block'},loading:'lazy'})
-        :el('video',{src:post.media.url,controls:true,playsInline:true,style:{width:'100%',maxHeight:'360px',display:'block',background:'#000'}}));
+      const mw=div({marginBottom:'10px',borderRadius:'8px',overflow:'hidden',background:'#f0ebe4'});
+      if(post.media.type==='image'){
+        mw.appendChild(el('img',{src:post.media.url,loading:'lazy',style:{width:'100%',maxHeight:'600px',objectFit:'contain',display:'block'}}));
+      } else {
+        mw.appendChild(el('video',{src:post.media.url,controls:true,playsInline:true,style:{width:'100%',maxHeight:'500px',display:'block',background:'#000'}}));
+      }
       pc.appendChild(mw);
     }
 
@@ -1632,11 +1634,14 @@ function renderConversation(uid) {
 
   // Input
   const inp = div({ padding: '10px 16px', borderTop: '1px solid #ede8e0', display: 'flex', gap: '8px', flexShrink: 0 });
-  const ti = el('input', { type: 'text', placeholder: 'Envoyer un message...', value: STATE.msgInput || '', style: { flex: 1, border: 'none', borderBottom: '1px solid #d5cfc8', outline: 'none', padding: '6px 0', fontFamily: "'Lora',serif", fontSize: '14px', color: '#2a2420', background: 'transparent' } });
+  const ti = el('input', { type: 'text', placeholder: 'Envoyer un message...', style: { flex: 1, border: 'none', borderBottom: '1px solid #d5cfc8', outline: 'none', padding: '6px 0', fontFamily: "'Lora',serif", fontSize: '14px', color: '#2a2420', background: 'transparent' } });
   ti.addEventListener('input', e => { STATE.msgInput = e.target.value; });
+  // Restore value after render
+  ti.value = STATE.msgInput || '';
   const send = async () => {
-    const txt = STATE.msgInput?.trim();
+    const txt = (ti.value || STATE.msgInput || '').trim();
     if (!txt) return;
+    ti.value = '';
     STATE.msgInput = '';
     const newMsg = { senderId: STATE.currentUser.uid, text: txt, ts: Date.now(), read: false };
     const convRef = doc(db, 'conversations', key);
@@ -1651,7 +1656,11 @@ function renderConversation(uid) {
   };
   ti.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
   inp.appendChild(ti);
-  inp.appendChild(btn({ background: '#2a2420', color: '#f5f0ea', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '14px', cursor: 'pointer', flexShrink: 0 }, '↑', send));
+  const sendBtn = document.createElement('button');
+  sendBtn.type = 'button'; sendBtn.textContent = '↑';
+  sendBtn.style.cssText = 'background:#2a2420;color:#f5f0ea;border:none;width:32px;height:32px;border-radius:50%;font-size:14px;cursor:pointer;flex-shrink:0;';
+  sendBtn.onclick = send;
+  inp.appendChild(sendBtn);
   root.appendChild(inp);
 
   return root;
