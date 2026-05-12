@@ -314,6 +314,7 @@ let STATE = {
   msgInput:    '',
   adminSection:'overview',
   adminConfirm:null,
+  maintenance:false,
   postsLoading:true,
   toast:       null,
 };
@@ -784,7 +785,7 @@ function renderVideos(){
   const me = STATE.userProfile||{};
 
   // Container — full height, black bg, no scroll
-  const maxH = isDesktop() ? 'calc(100vh - 57px)' : 'calc(100vh - 120px)';
+  const maxH = isDesktop() ? '100vh' : 'calc(100vh - 120px)';
   const vidWidth = isDesktop() ? 'min(400px, 60%)' : '100%';
   const root = div({
     position:'relative', background:'#111',
@@ -1634,15 +1635,15 @@ function renderConversation(uid) {
 
   // Input
   const inp = div({ padding: '10px 16px', borderTop: '1px solid #ede8e0', display: 'flex', gap: '8px', flexShrink: 0 });
-  const ti = el('input', { type: 'text', placeholder: 'Envoyer un message...', style: { flex: 1, border: 'none', borderBottom: '1px solid #d5cfc8', outline: 'none', padding: '6px 0', fontFamily: "'Lora',serif", fontSize: '14px', color: '#2a2420', background: 'transparent' } });
-  ti.addEventListener('input', e => { STATE.msgInput = e.target.value; });
-  // Restore value after render
+  const ti = el('input', { type: 'text', placeholder: 'Envoyer un message...', id:'msg-input', name:'message', style: { flex: 1, border: 'none', borderBottom: '1px solid #d5cfc8', outline: 'none', padding: '6px 0', fontFamily: "'Lora',serif", fontSize: '14px', color: '#2a2420', background: 'transparent' } });
   ti.value = STATE.msgInput || '';
+  ti.addEventListener('input', e => { STATE.msgInput = e.target.value; });
+  ti.addEventListener('focus', () => { ti.value = STATE.msgInput || ''; });
   const send = async () => {
-    const txt = (ti.value || STATE.msgInput || '').trim();
+    const txt = (STATE.msgInput || ti.value || '').trim();
     if (!txt) return;
-    ti.value = '';
     STATE.msgInput = '';
+    ti.value = '';
     const newMsg = { senderId: STATE.currentUser.uid, text: txt, ts: Date.now(), read: false };
     const convRef = doc(db, 'conversations', key);
     try {
@@ -1697,7 +1698,7 @@ function renderAdmin(){
     if(changed) render();
   });
 
-  const root = div({minHeight:'100vh',background:BG,paddingBottom:'20px'});
+  const root = div({background:BG,paddingBottom:'20px'});
 
   // ── Tabs ──
   const tabDefs = isSuperAdmin
@@ -1725,11 +1726,34 @@ function renderAdmin(){
   });
   root.appendChild(tabs);
 
-  const content=div({padding:'18px 16px'});
+  const content=div({padding:'18px 16px',position:'relative',zIndex:1});
 
   // ══ OVERVIEW ══
   if(sec==='overview'){
     const lbl=(t)=>el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:MUTED,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'14px',marginTop:'22px'}},t);
+    // Maintenance toggle (superAdmin only)
+    if(isSuperAdmin){
+      const maintBox=div({background:STATE.maintenance?'#fff0f0':'#f0fff4',border:'1px solid '+(STATE.maintenance?'#e0c0c0':'#b0d8b0'),borderRadius:'8px',padding:'14px 16px',marginBottom:'20px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'12px'});
+      const maintInfo=div({flex:1});
+      maintInfo.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:TXT}},'Mode maintenance'));
+      maintInfo.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED,marginTop:'2px'}},STATE.maintenance?'🔴 Actif — site bloqué pour les membres':'🟢 Inactif — site accessible normalement'));
+      maintBox.appendChild(maintInfo);
+      const toggleBtn=document.createElement('button');
+      toggleBtn.type='button';
+      toggleBtn.textContent=STATE.maintenance?'Désactiver':'Activer';
+      toggleBtn.style.cssText='background:'+(STATE.maintenance?DANGER:'#2a2420')+';color:#fff;border:none;padding:8px 16px;border-radius:20px;font-family:"DM Sans",sans-serif;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;';
+      toggleBtn.onclick=async()=>{
+        const newVal=!STATE.maintenance;
+        try{
+          await setDoc(doc(db,'config','maintenance'),{enabled:newVal,updatedAt:serverTimestamp()});
+          STATE.maintenance=newVal;
+          toast(newVal?'Maintenance activée':'Maintenance désactivée');
+          render();
+        }catch(ex){toast('Erreur : '+ex.message,true);}
+      };
+      maintBox.appendChild(toggleBtn);
+      content.appendChild(maintBox);
+    }
     content.appendChild(lbl('Statistiques générales'));
     const grid=div({display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'8px'});
     const statItems = isSuperAdmin
@@ -2135,7 +2159,8 @@ function renderDesktop(){
   const showRight = !isAdmin && !isVideo;
 
   const center = div({
-    flex:1, minWidth:0, height:'100vh', overflowY:'auto',
+    flex:1, minWidth:0, height:'100vh',
+    overflowY: isVideo?'hidden':'auto',
     background: isVideo?'#000':'#faf7f3',
     borderRight: showRight?'1px solid #ede8e0':'none',
     display:'flex', flexDirection:'column',
@@ -2256,10 +2281,24 @@ function buildSuggestions(container, users, me) {
   });
 }
 
+function renderMaintenance(){
+  const root2=div({minHeight:'100vh',background:'#f5f0ea',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 20px',gap:'20px'});
+  root2.appendChild(el('div',{style:{fontSize:'48px'}},'🔧'));
+  root2.appendChild(el('div',{style:{fontFamily:"'Lora',serif",fontSize:'26px',fontWeight:500,color:'#2a2420',textAlign:'center'}},'Æther est en maintenance'));
+  root2.appendChild(el('p',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'14px',color:'#a09890',textAlign:'center',maxWidth:'320px',lineHeight:1.7}},'Nous effectuons des améliorations. Revenez dans quelques instants.'));
+  return root2;
+}
+
 function render(){
   const root=document.getElementById('root');
   root.innerHTML='';
   try{
+    // Maintenance mode - check Firestore flag
+    if(STATE.maintenance && !(STATE.userProfile?.isSuperAdmin)){
+      document.body.style.background='#f5f0ea';
+      root.appendChild(renderMaintenance());
+      return;
+    }
     if(!STATE.currentUser){
       document.body.style.background='#f5f0ea';
       root.appendChild(renderAuth());
@@ -2324,6 +2363,11 @@ onAuthStateChanged(auth, async user=>{
     }
     subscribeToPosts();
     subscribeToProfile(user.uid);
+    // Load maintenance flag
+    getDoc(doc(db,'config','maintenance')).then(snap=>{
+      if(snap.exists()) STATE.maintenance=snap.data().enabled===true;
+      render();
+    }).catch(()=>{});
     // Load all user profiles so Messages and Explore work immediately
     getDocs(collection(db,'users')).then(snap=>{
       snap.forEach(d=>{ STATE.users[d.id]={uid:d.id,...d.data()}; });
