@@ -360,14 +360,14 @@ function subscribeToPosts(){
     await Promise.all([...uidsToFetch].filter(uid=>!STATE.users[uid]).map(fetchUserProfile));
     STATE.posts=posts;
     STATE.postsLoading=false;
-    // Don't re-render if user is typing in messages or in admin tab
+    // Don't re-render if typing or in admin tab (would break button clicks)
     const activeEl = document.activeElement;
     const isTyping = activeEl && (activeEl.tagName==='INPUT'||activeEl.tagName==='TEXTAREA');
-    if(!isTyping) render();
-    else {
-      // Just update post count badge if admin overview is visible
-      const statEl = document.getElementById('admin-post-count');
-      if(statEl) statEl.textContent = String(posts.length);
+    const inAdmin = STATE.tab === 'admin';
+    if(!isTyping && !inAdmin) render();
+    else if(!isTyping && inAdmin) {
+      // In admin: just update the posts list in place if visible
+      STATE.postsLoading = false;
     }
   });
 }
@@ -1485,13 +1485,14 @@ function subscribeToConv(uid) {
     } else {
       STATE.msgConvs[key] = { messages: [] };
     }
-    // Only update messages list, preserve input focus
+    // Always do partial update - NEVER full render during conversation
+    // Full render would destroy the input field and kill the keyboard on mobile
     const msgsList = document.getElementById('conv-messages');
     if (msgsList) {
       updateMessagesList(msgsList, uid);
-    } else {
-      render();
     }
+    // If not in conversation view anymore, do nothing
+    // render() will be called naturally on next tab switch
   });
 }
 
@@ -1786,12 +1787,23 @@ function renderAdmin(){
     labelEl.style.cssText="font-family:'DM Sans',sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:"+(active?activeColor:MUTED)+";white-space:nowrap;";
     tabBtn.appendChild(iconEl);
     tabBtn.appendChild(labelEl);
-    tabBtn.onclick=()=>{ STATE.adminSection=id; render(); };
+    tabBtn.onclick=()=>{
+      STATE.adminSection=id;
+      // Re-render only the admin content area, not the whole app
+      const adminContent = document.getElementById('admin-content-area');
+      if(adminContent) {
+        adminContent.innerHTML = '';
+        const tmpAdmin = renderAdmin();
+        const newContent = tmpAdmin.querySelector('#admin-content-area');
+        if(newContent) adminContent.appendChild(...newContent.childNodes);
+        else render();
+      } else { render(); }
+    };
     tabs.appendChild(tabBtn);
   });
   root.appendChild(tabs);
 
-  const content=div({padding:'18px 16px',position:'relative',zIndex:1});
+  const content=div({id:'admin-content-area',padding:'18px 16px',position:'relative',zIndex:1});
 
   // ══ OVERVIEW ══
   if(sec==='overview'){
@@ -2453,11 +2465,16 @@ onAuthStateChanged(auth, async user=>{
 // Initial render (shows loading state)
 render();
 
-// Re-render on resize (mobile <-> desktop switch)
+// Re-render only when WIDTH changes (desktop<->mobile switch)
+// Ignore height changes = mobile keyboard open/close
 let _resizeTimer;
+let _lastWidth = window.innerWidth;
 window.addEventListener('resize', ()=>{
+  const newWidth = window.innerWidth;
+  if(newWidth === _lastWidth) return; // Height-only change (keyboard) - ignore
+  _lastWidth = newWidth;
   clearTimeout(_resizeTimer);
-  _resizeTimer = setTimeout(render, 150);
+  _resizeTimer = setTimeout(render, 200);
 });
 </script>
 </body>
