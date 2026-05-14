@@ -322,6 +322,9 @@ let unsubPosts = null;
 let unsubConv = null; // Active conversation listener
 let unsubProfile = null; // Own profile real-time listener
 
+// ── Device detection ─────────────────────────────────────────────
+function isDesktop(){ return window.innerWidth >= 768; }
+
 // Global render lock - prevents DOM rebuild during click handlers
 let _renderLocked = false;
 let _pendingRender = false;
