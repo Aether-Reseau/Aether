@@ -1754,16 +1754,125 @@ function renderConversation(uid) {
 // ══════════════════════════════════════════════════════════════════
 // ADMIN PANEL
 // ══════════════════════════════════════════════════════════════════
+// ── Admin action handler (event delegation) ──────────────────────
+function handleAdminAction(action, data){
+  lockRender(800);
+  const BG='#faf7f3',CARD='#f5f0ea',BDR='#ede8e0',TXT='#2a2420',
+        MUTED='#a09890',ACCENT='#c17a4a',DANGER='#c0392b',GOLD='#b8860b';
+  switch(action){
+    case 'tab':
+      STATE.adminSection = data.id;
+      refreshAdmin();
+      break;
+    case 'confirm-delete':
+      STATE.adminConfirm = {type: data.type, id: data.id, uid: data.uid, name: data.name};
+      refreshAdmin();
+      break;
+    case 'cancel-confirm':
+      STATE.adminConfirm = null;
+      refreshAdmin();
+      break;
+    case 'do-delete':
+      (async()=>{
+        if(STATE.adminConfirm?.type==='post'){
+          try{ await deleteDoc(doc(db,'posts',STATE.adminConfirm.id)); }catch(e){toast('Erreur',true);}
+        } else if(STATE.adminConfirm?.type==='user'){
+          try{
+            const ups=STATE.posts.filter(p=>p.userId===STATE.adminConfirm.uid);
+            await Promise.all(ups.map(p=>deleteDoc(doc(db,'posts',p.id))));
+            await deleteDoc(doc(db,'users',STATE.adminConfirm.uid));
+            delete STATE.users[STATE.adminConfirm.uid];
+          }catch(e){toast('Erreur',true);}
+        }
+        STATE.adminConfirm=null;
+        refreshAdmin();
+      })();
+      break;
+    case 'set-role':
+      (async()=>{
+        const upd={isAdmin:data.role==='admin'||data.role==='superAdmin',isSuperAdmin:data.role==='superAdmin'};
+        try{
+          await updateDoc(doc(db,'users',data.uid),upd);
+          STATE.users[data.uid]={...STATE.users[data.uid],...upd};
+          toast('Rôle mis à jour');
+        }catch(e){toast('Erreur : '+e.message,true);}
+        refreshAdmin();
+      })();
+      break;
+    case 'set-grade':
+      (async()=>{
+        const newGrade=data.grade==='none'?null:data.grade;
+        try{
+          await updateDoc(doc(db,'users',data.uid),{grade:newGrade});
+          STATE.users[data.uid]={...STATE.users[data.uid],grade:newGrade};
+          toast('Grade mis à jour');
+        }catch(e){toast('Erreur : '+e.message,true);}
+        refreshAdmin();
+      })();
+      break;
+    case 'promote-admin':
+      (async()=>{
+        try{await updateDoc(doc(db,'users',data.uid),{isAdmin:true});}catch(e){toast('Erreur',true);}
+        STATE.users[data.uid]={...STATE.users[data.uid],isAdmin:true};
+        toast('Promu Admin');
+        refreshAdmin();
+      })();
+      break;
+    case 'degrade-admin':
+      (async()=>{
+        try{await updateDoc(doc(db,'users',data.uid),{isAdmin:false});}catch(e){toast('Erreur',true);}
+        STATE.users[data.uid]={...STATE.users[data.uid],isAdmin:false};
+        toast('Rétrogradé');
+        refreshAdmin();
+      })();
+      break;
+    case 'toggle-maintenance':
+      (async()=>{
+        const newVal=!STATE.maintenance;
+        try{
+          await setDoc(doc(db,'config','maintenance'),{enabled:newVal,updatedAt:serverTimestamp()});
+          STATE.maintenance=newVal;
+          toast(newVal?'Maintenance activée':'Maintenance désactivée');
+        }catch(e){toast('Erreur : '+e.message,true);}
+        refreshAdmin();
+      })();
+      break;
+  }
+}
+
+// Refresh only the admin content area (not the full page)
+function refreshAdmin(){
+  const container = document.getElementById('admin-root');
+  if(!container){ render(); return; }
+  container.innerHTML='';
+  buildAdminContent(container);
+}
+
 function renderAdmin(){
+  const root = document.createElement('div');
+  root.id = 'admin-root';
+  root.style.cssText = 'background:#faf7f3;padding-bottom:20px;';
+  // Attach ONE delegated listener on the stable root
+  root.addEventListener('click', e=>{
+    const btn = e.target.closest('[data-action]');
+    if(!btn) return;
+    e.preventDefault(); e.stopPropagation();
+    const action = btn.dataset.action;
+    let data = {};
+    try{ data = JSON.parse(btn.dataset.payload||'{}'); }catch(err){}
+    handleAdminAction(action, data);
+  });
+  buildAdminContent(root);
+  return root;
+}
+
+function buildAdminContent(root){
   const sec  = STATE.adminSection;
   const conf = STATE.adminConfirm;
   const me   = STATE.userProfile||{};
   const isSuperAdmin = !!me.isSuperAdmin;
-
-  // Palette
-  const BG='#faf7f3',CARD='#f5f0ea',BDR='#ede8e0',TXT='#2a2420',MUTED='#a09890',ACCENT='#c17a4a',DANGER='#c0392b',GOLD='#b8860b';
-
-  // User sets
+  const BG='#faf7f3',CARD='#f5f0ea',BDR='#ede8e0',TXT='#2a2420',
+        MUTED='#a09890',ACCENT='#c17a4a',DANGER='#c0392b',GOLD='#b8860b';
   const allU   = Object.values(STATE.users);
   const members= allU.filter(u=>!u.isAdmin&&!u.isSuperAdmin);
   const admins = allU.filter(u=>u.isAdmin&&!u.isSuperAdmin);
@@ -1771,164 +1880,122 @@ function renderAdmin(){
   const totalLikes    = STATE.posts.reduce((s,p)=>s+(p.likes||0),0);
   const totalComments = STATE.posts.reduce((s,p)=>s+(p.comments||[]).length,0);
 
-  // Always refresh user list
-  getDocs(collection(db,'users')).then(snap=>{
-    let changed=false;
-    snap.forEach(d=>{ const nd={uid:d.id,...d.data()}; if(JSON.stringify(STATE.users[d.id])!==JSON.stringify(nd)){STATE.users[d.id]=nd;changed=true;} });
-    if(changed) render();
-  });
-
-  const root = div({background:BG,paddingBottom:'20px'});
+  // Helper to create action button
+  function aBtn(text, action, payload={}, style=''){
+    const b = document.createElement('button');
+    b.type='button'; b.textContent=text;
+    b.dataset.action=action;
+    b.dataset.payload=JSON.stringify(payload);
+    if(style) b.style.cssText=style;
+    return b;
+  }
 
   // ── Tabs ──
   const tabDefs = isSuperAdmin
     ? [['overview',"Vue d'ensemble",'◈'],['members','Membres','◎'],['admins','Admins','⬡'],['posts','Publications','≡'],['roles','Rôles','◇']]
     : [['overview',"Vue d'ensemble",'◈'],['members','Membres','◎'],['posts','Publications','≡']];
 
-  const tabs = div({display:'flex',borderBottom:'1px solid '+BDR,overflowX:'auto'});
+  const tabs = document.createElement('div');
+  tabs.style.cssText = 'display:flex;border-bottom:1px solid '+BDR+';overflow-x:auto;';
   tabDefs.forEach(([id,label,icon])=>{
     const active=sec===id;
     const isGold=isSuperAdmin&&id==='roles';
     const activeColor=isGold?GOLD:ACCENT;
-    const tabBtn=document.createElement('button');
-    tabBtn.type='button';
-    tabBtn.style.cssText='flex:1;min-width:70px;background:none;border:none;border-bottom:2px solid '+(active?activeColor:'transparent')+';cursor:pointer;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;outline:none;';
+    const b = aBtn('', 'tab', {id},
+      'flex:1;min-width:70px;background:none;border:none;border-bottom:2px solid '+(active?activeColor:'transparent')+';cursor:pointer;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;outline:none;'
+    );
     const iconEl=document.createElement('span');
-    iconEl.textContent=icon;
-    iconEl.style.cssText='font-size:15px;color:'+(active?activeColor:MUTED)+';';
+    iconEl.textContent=icon; iconEl.style.cssText='font-size:15px;color:'+(active?activeColor:MUTED)+';pointer-events:none;';
     const labelEl=document.createElement('span');
-    labelEl.textContent=label;
-    labelEl.style.cssText="font-family:'DM Sans',sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:"+(active?activeColor:MUTED)+";white-space:nowrap;";
-    tabBtn.appendChild(iconEl);
-    tabBtn.appendChild(labelEl);
-    tabBtn.onclick=()=>{ lockRender(300);
-      STATE.adminSection=id;
-      // Re-render only the admin content area, not the whole app
-      const adminContent = document.getElementById('admin-content-area');
-      if(adminContent) {
-        adminContent.innerHTML = '';
-        const tmpAdmin = renderAdmin();
-        const newContent = tmpAdmin.querySelector('#admin-content-area');
-        if(newContent) adminContent.appendChild(...newContent.childNodes);
-        else render();
-      } else { render(); }
-    };
-    tabs.appendChild(tabBtn);
+    labelEl.textContent=label; labelEl.style.cssText="font-family:'DM Sans',sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:"+(active?activeColor:MUTED)+";white-space:nowrap;pointer-events:none;";
+    b.appendChild(iconEl); b.appendChild(labelEl);
+    tabs.appendChild(b);
   });
   root.appendChild(tabs);
 
-  const content=div({id:'admin-content-area',padding:'18px 16px',position:'relative',zIndex:1});
+  const content = document.createElement('div');
+  content.style.cssText = 'padding:18px 16px;';
 
   // ══ OVERVIEW ══
   if(sec==='overview'){
-    const lbl=(t)=>el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:MUTED,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'14px',marginTop:'22px'}},t);
-    // Maintenance toggle (superAdmin only)
+    const lbl=(t)=>{const d=document.createElement('div');d.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:"+MUTED+";text-transform:uppercase;letter-spacing:0.1em;margin-bottom:14px;margin-top:22px;";d.textContent=t;return d;};
+
+    // Maintenance toggle
     if(isSuperAdmin){
-      const maintBox=div({background:STATE.maintenance?'#fff0f0':'#f0fff4',border:'1px solid '+(STATE.maintenance?'#e0c0c0':'#b0d8b0'),borderRadius:'8px',padding:'14px 16px',marginBottom:'20px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'12px'});
-      const maintInfo=div({flex:1});
-      maintInfo.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:TXT}},'Mode maintenance'));
-      maintInfo.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED,marginTop:'2px'}},STATE.maintenance?'🔴 Actif — site bloqué pour les membres':'🟢 Inactif — site accessible normalement'));
-      maintBox.appendChild(maintInfo);
-      const toggleBtn=document.createElement('button');
-      toggleBtn.type='button';
-      toggleBtn.textContent=STATE.maintenance?'Désactiver':'Activer';
-      toggleBtn.style.cssText='background:'+(STATE.maintenance?DANGER:'#2a2420')+';color:#fff;border:none;padding:8px 16px;border-radius:20px;font-family:"DM Sans",sans-serif;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;';
-      toggleBtn.onclick=async()=>{ lockRender(800);
-        const newVal=!STATE.maintenance;
-        try{
-          await setDoc(doc(db,'config','maintenance'),{enabled:newVal,updatedAt:serverTimestamp()});
-          STATE.maintenance=newVal;
-          toast(newVal?'Maintenance activée':'Maintenance désactivée');
-          render();
-        }catch(ex){toast('Erreur : '+ex.message,true);}
-      };
-      maintBox.appendChild(toggleBtn);
-      content.appendChild(maintBox);
+      const on=STATE.maintenance;
+      const mb=document.createElement('div');
+      mb.style.cssText='background:'+(on?'#fff0f0':'#f0fff4')+';border:1px solid '+(on?'#e0c0c0':'#b0d8b0')+';border-radius:8px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;';
+      const mi=document.createElement('div');
+      const mt=document.createElement('div');mt.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:"+TXT+";";mt.textContent='Mode maintenance';
+      const ms=document.createElement('div');ms.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;color:"+MUTED+";margin-top:2px;";ms.textContent=on?'🔴 Actif — site bloqué':'🟢 Inactif — accessible';
+      mi.appendChild(mt);mi.appendChild(ms);mb.appendChild(mi);
+      const tb=aBtn(on?'Désactiver':'Activer','toggle-maintenance',{},'background:'+(on?DANGER:'#2a2420')+';color:#fff;border:none;padding:8px 16px;border-radius:20px;font-family:"DM Sans",sans-serif;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;');
+      mb.appendChild(tb);
+      content.appendChild(mb);
     }
-    content.appendChild(lbl('Statistiques générales'));
-    const grid=div({display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'8px'});
-    const statItems = isSuperAdmin
-      ? [['Membres',members.length,'◎'],['Admins',admins.length,'⬡'],['Super Admins',supers.length,'★'],['Publications',STATE.posts.length,'≡'],["J'aime",totalLikes,'♡'],['Commentaires',totalComments,'◯']]
-      : [['Membres',members.length,'◎'],['Publications',STATE.posts.length,'≡'],["J'aime",totalLikes,'♡'],['Commentaires',totalComments,'◯']];
+
+    content.appendChild(lbl('Statistiques'));
+    const grid=document.createElement('div');
+    grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;';
+    const statItems=isSuperAdmin
+      ?[['Membres',members.length,'◎'],['Admins',admins.length,'⬡'],['Super Admins',supers.length,'★'],['Publications',STATE.posts.length,'≡'],["J'aime",totalLikes,'♡'],['Commentaires',totalComments,'◯']]
+      :[['Membres',members.length,'◎'],['Publications',STATE.posts.length,'≡'],["J'aime",totalLikes,'♡'],['Commentaires',totalComments,'◯']];
     statItems.forEach(([l,v,ic])=>{
-      const c=div({background:CARD,padding:'14px',borderRadius:'4px',border:'1px solid '+BDR});
-      c.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'22px',color:TXT,fontWeight:700,marginBottom:'3px'}},String(v)));
-      c.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:MUTED,textTransform:'uppercase',letterSpacing:'0.08em'}},ic+' '+l));
-      grid.appendChild(c);
+      const c=document.createElement('div');
+      c.style.cssText='background:'+CARD+';padding:14px;border-radius:4px;border:1px solid '+BDR+';';
+      const vd=document.createElement('div');vd.style.cssText="font-family:'DM Sans',sans-serif;font-size:22px;color:"+TXT+";font-weight:700;margin-bottom:3px;";vd.textContent=String(v);
+      const ld=document.createElement('div');ld.style.cssText="font-family:'DM Sans',sans-serif;font-size:10px;color:"+MUTED+";text-transform:uppercase;letter-spacing:0.08em;";ld.textContent=ic+' '+l;
+      c.appendChild(vd);c.appendChild(ld);grid.appendChild(c);
     });
     content.appendChild(grid);
     content.appendChild(lbl('Membres récents'));
     [...members].slice(-4).reverse().forEach(u=>{
-      const r=div({display:'flex',gap:'12px',alignItems:'center',padding:'10px 0',borderBottom:'1px solid '+BDR});
+      const r=document.createElement('div');
+      r.style.cssText='display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid '+BDR+';';
       r.appendChild(Avatar(u,34));
-      const inf=div({flex:1});
-      inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:TXT}},u.displayName||''));
-      inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED}},'@'+(u.handle||'')+' · '+(u.followers||0)+' abonnés · '+STATE.posts.filter(p=>p.userId===u.uid).length+' posts'));
-      r.appendChild(inf);
+      const inf=document.createElement('div');inf.style.flex='1';
+      const nd=document.createElement('div');nd.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:"+TXT+";";nd.textContent=u.displayName||'';
+      const hd2=document.createElement('div');hd2.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;color:"+MUTED+";";hd2.textContent='@'+(u.handle||'')+' · '+(u.followers||0)+' abonnés';
+      inf.appendChild(nd);inf.appendChild(hd2);r.appendChild(inf);
       content.appendChild(r);
     });
   }
 
   // ══ MEMBERS ══
   else if(sec==='members'){
-    content.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:MUTED,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'14px'}},members.length+' membre'+(members.length>1?'s':'')));
-    if(!members.length){content.appendChild(Spinner());}
-    else members.forEach(u=>{
-      const r=div({display:'flex',gap:'12px',alignItems:'center',padding:'12px 0',borderBottom:'1px solid '+BDR});
+    const hd2=document.createElement('div');hd2.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:"+MUTED+";text-transform:uppercase;letter-spacing:0.1em;margin-bottom:14px;";hd2.textContent=members.length+' membre'+(members.length>1?'s':'');
+    content.appendChild(hd2);
+    members.forEach(u=>{
+      const r=document.createElement('div');r.style.cssText='display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid '+BDR+';';
       r.appendChild(Avatar(u,40));
-      const inf=div({flex:1,minWidth:'0'});
-      const admMNameRow=div({display:'flex',alignItems:'center',gap:'6px'});
-      admMNameRow.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:TXT}},u.displayName||''));
-      const admgb=GradeBadge(u,true); if(admgb) admMNameRow.appendChild(admgb);
-      inf.appendChild(admMNameRow);
-      inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED}},'@'+(u.handle||'')+' · '+STATE.posts.filter(p=>p.userId===u.uid).length+' posts · '+(u.followers||0)+' abonnés'));
-      r.appendChild(inf);
-      const actions=div({display:'flex',gap:'6px'});
+      const inf=document.createElement('div');inf.style.cssText='flex:1;min-width:0;';
+      const nd=document.createElement('div');nd.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:"+TXT+";";nd.textContent=u.displayName||'';
+      const hd3=document.createElement('div');hd3.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;color:"+MUTED+";";hd3.textContent='@'+(u.handle||'')+' · '+STATE.posts.filter(p=>p.userId===u.uid).length+' posts';
+      inf.appendChild(nd);inf.appendChild(hd3);r.appendChild(inf);
+      const actions=document.createElement('div');actions.style.cssText='display:flex;gap:6px;flex-shrink:0;';
       if(isSuperAdmin){
-        const promoteBtn=document.createElement('button');
-        promoteBtn.type='button'; promoteBtn.textContent='→ Admin';
-        promoteBtn.style.cssText='background:none;border:1px solid '+BDR+';padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+MUTED+';cursor:pointer;flex-shrink:0;';
-        promoteBtn.onclick=async()=>{ lockRender(600);
-          try{await updateDoc(doc(db,'users',u.uid),{isAdmin:true});}catch(e){toast('Erreur',true);}
-          STATE.users[u.uid]={...u,isAdmin:true};render();
-        };
-        actions.appendChild(promoteBtn);
+        actions.appendChild(aBtn('→ Admin','promote-admin',{uid:u.uid},'background:none;border:1px solid '+BDR+';padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+MUTED+';cursor:pointer;'));
       }
-      const delABtn=document.createElement('button');
-      delABtn.type='button';delABtn.textContent='Supprimer';
-      delABtn.style.cssText='background:none;border:1px solid #e0c0c0;padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+DANGER+';cursor:pointer;flex-shrink:0;';
-      delABtn.onclick=()=>{ lockRender(300); setState({adminConfirm:{type:'user',uid:u.uid,name:u.displayName||u.handle||'?'}}); };
-      actions.appendChild(delABtn);
+      actions.appendChild(aBtn('Supprimer','confirm-delete',{type:'user',uid:u.uid,name:u.displayName||u.handle||'?'},'background:none;border:1px solid #e0c0c0;padding:5px 12px;border-radius:14px;font-family:"DM Sans",sans-serif;font-size:11px;color:'+DANGER+';cursor:pointer;'));
       r.appendChild(actions);
       content.appendChild(r);
     });
   }
 
-  // ══ ADMINS (superAdmin only) ══
+  // ══ ADMINS ══
   else if(sec==='admins'&&isSuperAdmin){
-    content.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:MUTED,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'14px'}},admins.length+' admin'+(admins.length>1?'s':'')));
-    if(!admins.length){content.appendChild(el('p',{style:{fontFamily:"'Lora',serif",fontSize:'14px',color:MUTED,fontStyle:'italic'}},"Aucun admin pour l'instant."));}
-    else admins.forEach(u=>{
-      const r=div({display:'flex',gap:'12px',alignItems:'center',padding:'12px 0',borderBottom:'1px solid '+BDR});
+    const hd2=document.createElement('div');hd2.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:"+MUTED+";text-transform:uppercase;letter-spacing:0.1em;margin-bottom:14px;";hd2.textContent=admins.length+' admin'+(admins.length>1?'s':'');
+    content.appendChild(hd2);
+    if(!admins.length){const p2=document.createElement('p');p2.style.cssText="font-family:'Lora',serif;font-size:14px;color:"+MUTED+";font-style:italic;";p2.textContent="Aucun admin.";content.appendChild(p2);}
+    admins.forEach(u=>{
+      const r=document.createElement('div');r.style.cssText='display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid '+BDR+';';
       r.appendChild(Avatar(u,40));
-      const inf=div({flex:1,minWidth:'0'});
-      inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:TXT}},u.displayName||''));
-      inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED}},'@'+(u.handle||'')+' · Admin'));
-      r.appendChild(inf);
-      const actions=div({display:'flex',gap:'6px'});
-      const degradeBtn=document.createElement('button');
-      degradeBtn.type='button'; degradeBtn.textContent='Rétrograder';
-      degradeBtn.style.cssText='background:none;border:1px solid '+BDR+';padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+MUTED+';cursor:pointer;flex-shrink:0;';
-      degradeBtn.onclick=async()=>{ lockRender(600);
-        try{await updateDoc(doc(db,'users',u.uid),{isAdmin:false});}catch(e){toast('Erreur',true);}
-        STATE.users[u.uid]={...u,isAdmin:false};render();
-      };
-      actions.appendChild(degradeBtn);
-      const delABtn=document.createElement('button');
-      delABtn.type='button';delABtn.textContent='Supprimer';
-      delABtn.style.cssText='background:none;border:1px solid #e0c0c0;padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+DANGER+';cursor:pointer;flex-shrink:0;';
-      delABtn.onclick=()=>{ lockRender(300); setState({adminConfirm:{type:'user',uid:u.uid,name:u.displayName||u.handle||'?'}}); };
-      actions.appendChild(delABtn);
+      const inf=document.createElement('div');inf.style.cssText='flex:1;min-width:0;';
+      const nd=document.createElement('div');nd.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:"+TXT+";";nd.textContent=u.displayName||'';
+      inf.appendChild(nd);r.appendChild(inf);
+      const actions=document.createElement('div');actions.style.cssText='display:flex;gap:6px;flex-shrink:0;';
+      actions.appendChild(aBtn('Rétrograder','degrade-admin',{uid:u.uid},'background:none;border:1px solid '+BDR+';padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+MUTED+';cursor:pointer;'));
+      actions.appendChild(aBtn('Supprimer','confirm-delete',{type:'user',uid:u.uid,name:u.displayName||u.handle||'?'},'background:none;border:1px solid #e0c0c0;padding:4px 10px;border-radius:12px;font-family:"DM Sans",sans-serif;font-size:10px;color:'+DANGER+';cursor:pointer;'));
       r.appendChild(actions);
       content.appendChild(r);
     });
@@ -1936,93 +2003,64 @@ function renderAdmin(){
 
   // ══ POSTS ══
   else if(sec==='posts'){
-    content.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:MUTED,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'14px'}},STATE.posts.length+' publication'+(STATE.posts.length>1?'s':'')));
-    if(STATE.postsLoading){content.appendChild(Spinner());}
-    else STATE.posts.forEach(post=>{
+    const hd2=document.createElement('div');hd2.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:"+MUTED+";text-transform:uppercase;letter-spacing:0.1em;margin-bottom:14px;";hd2.textContent=STATE.posts.length+' publication'+(STATE.posts.length>1?'s':'');
+    content.appendChild(hd2);
+    STATE.posts.forEach(post=>{
       const u=STATE.users[post.userId]||{displayName:'?',handle:'?'};
-      const r=div({padding:'14px 0',borderBottom:'1px solid '+BDR,display:'flex',gap:'12px',alignItems:'flex-start'});
+      const r=document.createElement('div');r.style.cssText='padding:14px 0;border-bottom:1px solid '+BDR+';display:flex;gap:12px;align-items:flex-start;';
       r.appendChild(Avatar(u,34));
-      const inf=div({flex:1,minWidth:'0'});
-      const nh=div({display:'flex',gap:'8px',alignItems:'baseline',marginBottom:'4px'});
-      nh.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',fontWeight:600,color:TXT}},u.displayName||'?'));
-      nh.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED}},'@'+(u.handle||'?')));
-      inf.appendChild(nh);
+      const inf=document.createElement('div');inf.style.cssText='flex:1;min-width:0;';
+      const nh=document.createElement('div');nh.style.cssText='display:flex;gap:8px;align-items:baseline;margin-bottom:4px;';
+      const ns=document.createElement('span');ns.style.cssText="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:"+TXT+";";ns.textContent=u.displayName||'?';
+      const hs=document.createElement('span');hs.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;color:"+MUTED+";";hs.textContent='@'+(u.handle||'?');
+      nh.appendChild(ns);nh.appendChild(hs);inf.appendChild(nh);
       if(post.content){const pt=document.createElement('p');pt.style.cssText="font-family:'Lora',serif;font-size:13px;color:#5a504a;margin:0 0 4px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;";pt.textContent=post.content;inf.appendChild(pt);}
-      if(post.media) inf.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:MUTED}},post.media.type==='image'?'🖼 Image':'▶ Vidéo'));
-      inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:MUTED,marginTop:'3px'}},'♡ '+(post.likes||0)+' · ◯ '+(post.comments||[]).length));
+      if(post.media){const mt=document.createElement('span');mt.style.cssText="font-family:'DM Sans',sans-serif;font-size:10px;color:"+MUTED+";";mt.textContent=post.media.type==='image'?'🖼 Image':'▶ Vidéo';inf.appendChild(mt);}
+      const ls=document.createElement('div');ls.style.cssText="font-family:'DM Sans',sans-serif;font-size:10px;color:"+MUTED+";margin-top:3px;";ls.textContent='♡ '+(post.likes||0)+' · ◯ '+(post.comments||[]).length;inf.appendChild(ls);
       r.appendChild(inf);
-      const delPBtn2=document.createElement('button');
-      delPBtn2.type='button'; delPBtn2.textContent='✕';
-      delPBtn2.style.cssText='background:none;border:1px solid #e0c0c0;padding:4px 10px;border-radius:10px;font-family:"DM Sans",sans-serif;font-size:11px;color:'+DANGER+';cursor:pointer;flex-shrink:0;';
-      delPBtn2.onclick=()=>{ lockRender(300); setState({adminConfirm:{type:'post',id:post.id,name:(post.content||'(média)').slice(0,30)+'…'}}); };
-      r.appendChild(delPBtn2);
+      r.appendChild(aBtn('✕','confirm-delete',{type:'post',id:post.id,name:(post.content||'(média)').slice(0,30)+'…'},'background:none;border:1px solid #e0c0c0;padding:4px 10px;border-radius:10px;font-family:"DM Sans",sans-serif;font-size:11px;color:'+DANGER+';cursor:pointer;flex-shrink:0;'));
       content.appendChild(r);
     });
   }
 
-  // ══ ROLES (superAdmin only) ══
+  // ══ ROLES ══
   else if(sec==='roles'&&isSuperAdmin){
-    content.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:MUTED,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'8px'}},'Gestion des rôles'));
-    const notice=div({background:'#fdf8e8',border:'1px solid #e8d870',padding:'12px 14px',borderRadius:'4px',marginBottom:'20px'});
-    notice.appendChild(el('p',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#7a6800',lineHeight:1.6}},'Promouvez des membres en Admin ou Super Admin. Un Super Admin a accès à tous les contrôles incluant la gestion des rôles.'));
-    content.appendChild(notice);
-    // All users with role badges
+    const hd2=document.createElement('div');hd2.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:"+MUTED+";text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;";hd2.textContent='Gestion des rôles';
+    content.appendChild(hd2);
+    const notice=document.createElement('div');notice.style.cssText='background:#fdf8e8;border:1px solid #e8d870;padding:12px 14px;border-radius:4px;margin-bottom:20px;';
+    const np=document.createElement('p');np.style.cssText="font-family:'DM Sans',sans-serif;font-size:12px;color:#7a6800;line-height:1.6;";np.textContent='Modifiez les rôles et grades de chaque membre.';
+    notice.appendChild(np);content.appendChild(notice);
     const allFiltered=[...supers,...admins,...members];
     allFiltered.forEach(u=>{
-      const r=div({display:'flex',gap:'12px',alignItems:'center',padding:'12px 0',borderBottom:'1px solid '+BDR});
+      if(u.uid===STATE.currentUser.uid) return;
+      const r=document.createElement('div');r.style.cssText='display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid '+BDR+';';
       r.appendChild(Avatar(u,38));
-      const inf=div({flex:1,minWidth:'0'});
-      const nh=div({display:'flex',gap:'8px',alignItems:'center'});
-      nh.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:TXT}},u.displayName||''));
-      inf.appendChild(nh);
-      inf.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:MUTED,marginTop:'2px'}},'@'+(u.handle||'')));
-      r.appendChild(inf);
-      if(u.uid!==STATE.currentUser.uid){
-        const currentRole = u.isSuperAdmin?'superAdmin':u.isAdmin?'admin':'member';
-        const rolesBtns = div({display:'flex',gap:'4px',flexShrink:0});
-        [['member','Membre'],['admin','Admin'],['superAdmin','Super']].forEach(([val,lbl])=>{
-          const isActive = currentRole===val;
-          const rb = document.createElement('button');
-          rb.type='button'; rb.textContent=lbl;
-          rb.style.cssText='padding:4px 10px;border-radius:12px;cursor:pointer;font-family:"DM Sans",sans-serif;font-size:10px;font-weight:'+(isActive?600:400)+';color:'+(isActive?(val==='superAdmin'?GOLD:val==='admin'?ACCENT:TXT):MUTED)+';background:'+(isActive?(val==='superAdmin'?'#fdf8e8':val==='admin'?'#f0e8e0':'#ede8e0'):'transparent')+';border:1px solid '+(isActive?(val==='superAdmin'?GOLD:val==='admin'?ACCENT:BDR):BDR)+';';
-          rb.onclick = async ()=>{ lockRender(600);
-            if(isActive) return;
-            const upd={isAdmin:val==='admin'||val==='superAdmin', isSuperAdmin:val==='superAdmin'};
-            try{
-              await updateDoc(doc(db,'users',u.uid),upd);
-              STATE.users[u.uid]={...u,...upd};
-              toast('Rôle mis à jour');
-              render();
-            }catch(ex){ toast('Erreur : '+ex.message, true); }
-          };
-          rolesBtns.appendChild(rb);
-        });
-        // Grade buttons
-        const currentGrade = u.grade || 'none';
-        const gradeBtns = div({display:'flex',gap:'4px',marginTop:'6px',flexWrap:'wrap'});
-        [['none','—'],['premium','💎'],['early_member','⭐'],['founder','👑']].forEach(([val,lbl])=>{
-          const isActive = currentGrade === val;
-          const gb = document.createElement('button');
-          gb.type='button'; gb.textContent=lbl;
-          gb.style.cssText='padding:3px 10px;border-radius:10px;cursor:pointer;font-family:"DM Sans",sans-serif;font-size:11px;color:'+(isActive?'#2a2420':'#a09890')+';background:'+(isActive?'#ede8e0':'transparent')+';border:1px solid '+(isActive?'#d5cfc8':'#ede8e0')+';';
-          gb.onclick = async () => { lockRender(600);
-            if(isActive) return;
-            const newGrade = val === 'none' ? null : val;
-            try {
-              await updateDoc(doc(db,'users',u.uid), {grade: newGrade});
-              STATE.users[u.uid] = {...u, grade: newGrade};
-              toast('Grade mis à jour');
-              render();
-            } catch(ex) { toast('Erreur : ' + ex.message, true); }
-          };
-          gradeBtns.appendChild(gb);
-        });
-
-        const actionsWrap = div({display:'flex',flexDirection:'column',gap:'4px',alignItems:'flex-end',flexShrink:0});
-        actionsWrap.appendChild(rolesBtns);
-        actionsWrap.appendChild(gradeBtns);
-        r.appendChild(actionsWrap);
-      }
+      const inf=document.createElement('div');inf.style.cssText='flex:1;min-width:0;';
+      const nd=document.createElement('div');nd.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:"+TXT+";";nd.textContent=u.displayName||'';
+      const hd3=document.createElement('div');hd3.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;color:"+MUTED+";margin-top:2px;";hd3.textContent='@'+(u.handle||'');
+      inf.appendChild(nd);inf.appendChild(hd3);r.appendChild(inf);
+      const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;';
+      // Role buttons
+      const currentRole=u.isSuperAdmin?'superAdmin':u.isAdmin?'admin':'member';
+      const rb=document.createElement('div');rb.style.cssText='display:flex;gap:4px;';
+      [['member','Membre'],['admin','Admin'],['superAdmin','Super']].forEach(([val,lbl])=>{
+        const isActive=currentRole===val;
+        const b=aBtn(lbl,'set-role',{uid:u.uid,role:val},
+          'padding:4px 10px;border-radius:12px;cursor:pointer;font-family:"DM Sans",sans-serif;font-size:10px;font-weight:'+(isActive?600:400)+';color:'+(isActive?(val==='superAdmin'?GOLD:val==='admin'?ACCENT:TXT):MUTED)+';background:'+(isActive?(val==='superAdmin'?'#fdf8e8':val==='admin'?'#f0e8e0':'#ede8e0'):'transparent')+';border:1px solid '+(isActive?(val==='superAdmin'?GOLD:val==='admin'?ACCENT:BDR):BDR)+';');
+        rb.appendChild(b);
+      });
+      wrap.appendChild(rb);
+      // Grade buttons
+      const currentGrade=u.grade||'none';
+      const gb=document.createElement('div');gb.style.cssText='display:flex;gap:4px;';
+      [['none','—'],['premium','💎'],['early_member','⭐'],['founder','👑']].forEach(([val,lbl])=>{
+        const isActive=currentGrade===val;
+        const b=aBtn(lbl,'set-grade',{uid:u.uid,grade:val},
+          'padding:3px 10px;border-radius:10px;cursor:pointer;font-family:"DM Sans",sans-serif;font-size:11px;color:'+(isActive?'#2a2420':'#a09890')+';background:'+(isActive?'#ede8e0':'transparent')+';border:1px solid '+(isActive?'#d5cfc8':'#ede8e0')+';');
+        gb.appendChild(b);
+      });
+      wrap.appendChild(gb);
+      r.appendChild(wrap);
       content.appendChild(r);
     });
   }
@@ -2031,306 +2069,19 @@ function renderAdmin(){
 
   // ── Confirm modal ──
   if(conf){
-    const overlay=div({position:'fixed',inset:'0',background:'rgba(42,36,32,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,padding:'20px'});
-    const modal=div({background:BG,padding:'28px 24px',maxWidth:'340px',width:'100%',borderRadius:'4px',boxShadow:'0 8px 40px rgba(42,36,32,0.2)'});
-    modal.appendChild(el('div',{style:{fontFamily:"'Lora',serif",fontSize:'17px',color:TXT,marginBottom:'10px'}},'Confirmer la suppression'));
-    const msg=document.createElement('p');
-    msg.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;color:#7a7068;margin-bottom:22px;line-height:1.6;";
-    msg.innerHTML='Supprimer '+(conf.type==='user'?'le compte':'la publication')+' <strong style="color:'+TXT+'">« '+conf.name+' »</strong> ?'+(conf.type==='user'?' Ses publications seront aussi supprimées.':'');
-    modal.appendChild(msg);
-    const mbtns=div({display:'flex',gap:'10px'});
-    const cancelB=document.createElement('button');cancelB.type='button';cancelB.textContent='Annuler';
-  cancelB.style.cssText='flex:1;background:none;border:1px solid '+BDR+';padding:11px;font-family:"DM Sans",sans-serif;font-size:12px;color:'+MUTED+';cursor:pointer;border-radius:2px;';
-  cancelB.onclick=()=>{ lockRender(300); setState({adminConfirm:null}); };
-  mbtns.appendChild(cancelB);
-    const deleteB=document.createElement('button');deleteB.type='button';deleteB.textContent='Supprimer';
-  deleteB.style.cssText='flex:1;background:'+DANGER+';border:none;padding:11px;font-family:"DM Sans",sans-serif;font-size:12px;color:#fff;cursor:pointer;border-radius:2px;font-weight:600;';
-  deleteB.onclick=async()=>{
-      if(conf.type==='post'){
-        try{await deleteDoc(doc(db,'posts',conf.id));}catch(e){console.error(e);}
-        setState({adminConfirm:null});
-      } else {
-        try{
-          const ups=STATE.posts.filter(p=>p.userId===conf.uid);
-          await Promise.all(ups.map(p=>deleteDoc(doc(db,'posts',p.id))));
-          await deleteDoc(doc(db,'users',conf.uid));
-          delete STATE.users[conf.uid];
-        }catch(e){console.error(e);}
-        setState({adminConfirm:null});
-      }
-    };
-    mbtns.appendChild(deleteB);
-    modal.appendChild(mbtns);
-    overlay.appendChild(modal);
-    root.appendChild(overlay);
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(42,36,32,0.6);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;';
+    const modal=document.createElement('div');
+    modal.style.cssText='background:#faf7f3;padding:28px 24px;max-width:340px;width:100%;border-radius:4px;box-shadow:0 8px 40px rgba(42,36,32,0.2);';
+    const title=document.createElement('div');title.style.cssText="font-family:'Lora',serif;font-size:17px;color:#2a2420;margin-bottom:10px;";title.textContent='Confirmer la suppression';
+    const msg=document.createElement('p');msg.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;color:#7a7068;margin-bottom:22px;line-height:1.6;";
+    msg.innerHTML='Supprimer '+(conf.type==='user'?'le compte':'la publication')+' <strong style="color:#2a2420">« '+conf.name+' »</strong> ?'+(conf.type==='user'?' Ses publications seront aussi supprimées.':'');
+    modal.appendChild(title);modal.appendChild(msg);
+    const btns=document.createElement('div');btns.style.cssText='display:flex;gap:10px;';
+    btns.appendChild(aBtn('Annuler','cancel-confirm',{},'flex:1;background:none;border:1px solid #ede8e0;padding:11px;font-family:"DM Sans",sans-serif;font-size:12px;color:#a09890;cursor:pointer;border-radius:2px;'));
+    btns.appendChild(aBtn('Supprimer','do-delete',{},'flex:1;background:#c0392b;border:none;padding:11px;font-family:"DM Sans",sans-serif;font-size:12px;color:#fff;cursor:pointer;border-radius:2px;font-weight:600;'));
+    modal.appendChild(btns);overlay.appendChild(modal);root.appendChild(overlay);
   }
-
-  return root;
-}
-
-function renderApp(){
-  const me=STATE.userProfile||{};
-  const {tab,profileUid,editing}=STATE;
-  const NAV=[
-    {id:'feed',    label:'Fil',      icon:'≡'},
-    {id:'explore', label:'Explorer', icon:'◎'},
-    {id:'videos',  label:'Vidéos',   icon:'▶'},
-    {id:'messages',label:'Messages', icon:'◇'},
-    {id:'me',      label:'Profil',   icon:'○'},
-    ...((me.isAdmin||me.isSuperAdmin)?[{id:'admin', label:me.isSuperAdmin?'S.Admin':'Admin', icon:me.isSuperAdmin?'★':'◈'}]:[]),
-  ];
-  const app=div({minHeight:'100vh',background:'#f5f0ea',display:'flex',justifyContent:'center'});
-  const shell=div({width:'100%',maxWidth:'560px',background:'#faf7f3',minHeight:'100vh',display:'flex',flexDirection:'column',boxShadow:'0 0 60px rgba(42,36,32,0.06)',position:'relative'});
-
-  // Header
-  const hd=div({padding:'14px 16px',borderBottom:'1px solid #ede8e0',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:'0',background:'#faf7f3',zIndex:10,flexShrink:0});
-  const logo=div({display:'flex',alignItems:'baseline',gap:'8px'},[
-    el('span',{style:{fontFamily:"'Lora',serif",fontWeight:500,fontSize:'21px',color:'#2a2420',letterSpacing:'-0.02em'}},'Æther'),
-    el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'9px',color:'#c5bfb8',textTransform:'uppercase',letterSpacing:'0.12em'}},'réseau')
-  ]);
-  hd.appendChild(logo);
-  const right=div({display:'flex',gap:'10px',alignItems:'center'});
-  // Loupe button — only on videos tab
-  if(tab==='videos'){
-    const loupeActive=STATE.videoSearchOpen;
-    const loupe=div({cursor:'pointer',fontSize:'16px',padding:'4px 6px',borderRadius:'8px',background:loupeActive?'#ede8e0':'transparent',color:loupeActive?'#2a2420':'#a09890',userSelect:'none'},'🔍');
-    loupe.addEventListener('click',()=>{
-      STATE.videoSearchOpen=!STATE.videoSearchOpen;
-      if(!STATE.videoSearchOpen) STATE.videoSearch='';
-      render();
-    });
-    right.appendChild(loupe);
-  }
-  if(me.handle) right.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a09890'}},'@'+me.handle));
-  right.appendChild(btn({background:'none',border:'none',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:'#c5bfb8',padding:'0'},'Déco',async()=>{
-    if(unsubPosts){unsubPosts();unsubPosts=null;}
-    if(unsubConv){unsubConv();unsubConv=null;}
-    if(unsubProfile){unsubProfile();unsubProfile=null;}
-    await signOut(auth);
-    STATE={...STATE,currentUser:null,userProfile:null,posts:[],users:{},tab:'feed',postsLoading:true};
-    render();
-  }));
-  hd.appendChild(right);
-  shell.appendChild(hd);
-
-  // Content
-  const content=div({flex:1,overflowY:'auto',paddingBottom:'72px'});
-  if(tab==='feed')         content.appendChild(renderFeed());
-  else if(tab==='explore') content.appendChild(renderExplore());
-  else if(tab==='videos')  content.appendChild(renderVideos());
-  else if(tab==='messages')content.appendChild(renderMessages());
-  else if(tab==='me'&&!editing)  content.appendChild(renderProfile(me,true,()=>{}));
-  else if(tab==='me'&&editing)   content.appendChild(renderEditProfile());
-  else if(tab==='admin'&&(me.isAdmin||me.isSuperAdmin)) content.appendChild(renderAdmin());
-  else if(tab==='profile'&&profileUid){
-    const u=STATE.users[profileUid];
-    if(u) content.appendChild(renderProfile(u,false,()=>setState({tab:'explore',profileUid:null})));
-    else{ content.appendChild(Spinner()); fetchUserProfile(profileUid).then(()=>render()); }
-  }
-  shell.appendChild(content);
-
-  // Bottom nav
-  const nav=div({position:'fixed',bottom:'0',left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'560px',background:'#faf7f3',borderTop:'1px solid #ede8e0',display:'flex',zIndex:20,padding:'6px 0',paddingBottom:'calc(6px + env(safe-area-inset-bottom,0px))'});
-  NAV.forEach(item=>{
-    const active=tab===item.id||(tab==='profile'&&item.id==='explore');
-    const isAdminTab=item.id==='admin';
-    nav.appendChild(btn({flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',padding:'4px 0'},[
-      el('span',{style:{fontSize:'17px',color:isAdminTab?(active?'#c17a4a':'#8a4a2a'):active?'#2a2420':'#c5bfb8',transition:'color 0.2s'}},item.icon),
-      el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'9px',letterSpacing:'0.06em',textTransform:'uppercase',color:isAdminTab?(active?'#c17a4a':'#8a4a2a'):active?'#2a2420':'#c5bfb8',transition:'color 0.2s'}},item.label)
-    ],()=>{STATE.editing=false;STATE.editForm=null;setState({tab:item.id});
-    // Preload users when switching to explore
-    if(item.id==='explore'){
-      getDocs(collection(db,'users')).then(snap=>{snap.forEach(d=>{STATE.users[d.id]={uid:d.id,...d.data()};});render();});
-    }
-    }));
-  });
-  shell.appendChild(nav);
-
-  // Toast
-  if(STATE.toast){
-    const t=div({position:'fixed',bottom:'80px',left:'50%',transform:'translateX(-50%)',background:STATE.toast.isErr?'#8a2010':'#2a2420',color:'#f5f0ea',padding:'10px 20px',borderRadius:'20px',fontFamily:"'DM Sans',sans-serif",fontSize:'13px',zIndex:50,whiteSpace:'nowrap',animation:'fadeIn 0.3s ease'},[STATE.toast.msg]);
-    shell.appendChild(t);
-  }
-
-  app.appendChild(shell);
-  return app;
-}
-
-// ══════════════════════════════════════════════════════════════════
-// RENDER
-// ══════════════════════════════════════════════════════════════════
-// ── Device detection ─────────────────────────────────────────────
-function isDesktop(){ return window.innerWidth >= 768; }
-
-// ── Desktop app shell ─────────────────────────────────────────────
-function renderDesktop(){
-  const me  = STATE.userProfile || {};
-  const { tab, profileUid, editing } = STATE;
-  const isAdmin = tab === 'admin';
-  const isVideo = tab === 'videos';
-
-  const layout = div({ display:'flex', height:'100vh', background:'#ede8e0', overflow:'hidden' });
-
-  // ══ SIDEBAR ══════════════════════════════════════════════════
-  const sidebar = div({
-    width:'240px', flexShrink:0, background:'#faf7f3',
-    borderRight:'1px solid #ede8e0', display:'flex',
-    flexDirection:'column', height:'100vh', overflow:'hidden'
-  });
-
-  const logoWrap = div({ padding:'20px 24px 20px', borderBottom:'1px solid #ede8e0' });
-  logoWrap.appendChild(el('div',{style:{fontFamily:"'Lora',serif",fontWeight:500,fontSize:'26px",color:"#2a2420',letterSpacing:'-0.02em'}},'Æther'));
-  logoWrap.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'9px',color:'#c5bfb8',textTransform:'uppercase',letterSpacing:'0.16em',marginTop:'2px'}},'réseau social'));
-  sidebar.appendChild(logoWrap);
-
-  const NAV_ITEMS = [
-    {id:'feed',    label:'Fil',        icon:'≡'},
-    {id:'explore', label:'Explorer',   icon:'◎'},
-    {id:'videos',  label:'Vidéos',     icon:'▶'},
-    {id:'messages',label:'Messages',   icon:'◇'},
-    {id:'me',      label:'Mon profil', icon:'○'},
-    ...((me.isAdmin||me.isSuperAdmin)?[{id:'admin',label:me.isSuperAdmin?'Super Admin':'Admin',icon:me.isSuperAdmin?'★':'◈'}]:[]),
-  ];
-
-  const navList = div({ padding:'8px 12px', flex:1, overflowY:'auto' });
-  NAV_ITEMS.forEach(item => {
-    const active = tab===item.id || (tab==='profile'&&item.id==='explore');
-    const isAdminItem = item.id==='admin';
-    const accentColor = me.isSuperAdmin?'#b8860b':'#c17a4a';
-    const navBtn = document.createElement('button');
-    navBtn.type = 'button';
-    navBtn.style.cssText = 'width:100%;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;border:none;cursor:pointer;background:'+(active?'#f0ebe4':'transparent')+';margin-bottom:2px;text-align:left;';
-    navBtn.onmouseenter = ()=>{ if(!active) navBtn.style.background='#f5f0ea'; };
-    navBtn.onmouseleave = ()=>{ if(!active) navBtn.style.background='transparent'; };
-    const iconSpan = document.createElement('span');
-    iconSpan.textContent = item.icon;
-    iconSpan.style.cssText = 'font-size:18px;color:'+(active?(isAdminItem?accentColor:'#2a2420'):(isAdminItem?accentColor:'#a09890'))+';';
-    const labelSpan = document.createElement('span');
-    labelSpan.textContent = item.label;
-    labelSpan.style.cssText = "font-family:'DM Sans',sans-serif;font-size:14px;font-weight:"+(active?600:400)+";color:"+(active?(isAdminItem?accentColor:'#2a2420'):(isAdminItem?accentColor:'#a09890'))+";";
-    navBtn.appendChild(iconSpan);
-    navBtn.appendChild(labelSpan);
-    navBtn.onclick = ()=>{
-      STATE.editing=false; STATE.editForm=null;
-      if(item.id==='videos'){STATE.videoIndex=0;STATE.videoShowComments=null;}
-      setState({tab:item.id});
-    };
-    navList.appendChild(navBtn);
-  });
-  sidebar.appendChild(navList);
-
-  // User card bottom
-  const userCard = div({ margin:'12px', padding:'12px', borderRadius:'12px', background:'#f0ebe4', display:'flex', alignItems:'center', gap:'10px' });
-  userCard.appendChild(Avatar(me, 36));
-  const ucInfo = div({ flex:1, minWidth:0 });
-  const ucName = div({ display:'flex', alignItems:'center', gap:'6px' });
-  ucName.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:'#2a2420',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},me.displayName||''));
-  const ucgb = GradeBadge(me, true); if(ucgb) ucName.appendChild(ucgb);
-  ucInfo.appendChild(ucName);
-  if(me.handle) ucInfo.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:'#a09890'}},'@'+me.handle));
-  userCard.appendChild(ucInfo);
-  const logoutBtn = document.createElement('button');
-  logoutBtn.type='button'; logoutBtn.textContent='⇥';
-  logoutBtn.style.cssText='background:none;border:none;cursor:pointer;color:#c5bfb8;font-size:16px;padding:4px;flex-shrink:0;';
-  logoutBtn.title='Déconnexion';
-  logoutBtn.onclick = async()=>{
-    if(unsubPosts){unsubPosts();unsubPosts=null;}
-    if(unsubConv){unsubConv();unsubConv=null;}
-    if(unsubProfile){unsubProfile();unsubProfile=null;}
-    await signOut(auth);
-    STATE={...STATE,currentUser:null,userProfile:null,posts:[],users:{},tab:'feed',postsLoading:true};
-    render();
-  };
-  userCard.appendChild(logoutBtn);
-  sidebar.appendChild(userCard);
-  layout.appendChild(sidebar);
-
-  // ══ CENTER — full width for admin/video, normal otherwise ══
-  const centerWidth = (isAdmin||isVideo) ? '1fr' : 'minmax(0,640px)';
-  const showRight = !isAdmin && !isVideo;
-
-  const center = div({
-    flex:1, minWidth:0, height:'100vh',
-    overflowY: isVideo?'hidden':'auto',
-    background: isVideo?'#000':'#faf7f3',
-    borderRight: showRight?'1px solid #ede8e0':'none',
-    display:'flex', flexDirection:'column',
-    position:'relative'
-  });
-
-  // Center header
-  if(!isVideo){
-    const mainHd = div({ padding:'16px 24px', borderBottom:'1px solid #ede8e0', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, background:'#faf7f3', zIndex:5, flexShrink:0 });
-    const titles = {feed:"Fil d'actualité",explore:'Explorer',messages:'Messages',me:'Mon profil',admin:'Administration',profile:'Profil'};
-    mainHd.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'16px',fontWeight:600,color:'#2a2420'}},titles[tab]||'Æther'));
-    center.appendChild(mainHd);
-  } else {
-    // Loupe for videos
-    const vidHd=div({padding:'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'absolute',top:0,left:0,right:0,zIndex:20,pointerEvents:'none'});
-    const loupeBtn=document.createElement('button');
-    loupeBtn.type='button'; loupeBtn.textContent='🔍';
-    loupeBtn.style.cssText='background:rgba(0,0,0,0.4);border:none;border-radius:20px;padding:6px 12px;cursor:pointer;font-size:16px;color:#fff;pointer-events:all;';
-    loupeBtn.onclick=()=>{ STATE.videoSearchOpen=!STATE.videoSearchOpen; if(!STATE.videoSearchOpen) STATE.videoSearch=''; render(); };
-    vidHd.appendChild(loupeBtn);
-    center.appendChild(vidHd);
-  }
-
-  // Content
-  const contentWrap = div({ flex:1 });
-  if(tab==='feed')           contentWrap.appendChild(renderFeed());
-  else if(tab==='explore')   contentWrap.appendChild(renderExplore());
-  else if(tab==='videos')    contentWrap.appendChild(renderVideos());
-  else if(tab==='messages')  contentWrap.appendChild(renderMessages());
-  else if(tab==='me'&&!editing) contentWrap.appendChild(renderProfile(me,true,()=>{}));
-  else if(tab==='me'&&editing)  contentWrap.appendChild(renderEditProfile());
-  else if(tab==='admin'&&(me.isAdmin||me.isSuperAdmin)) contentWrap.appendChild(renderAdmin());
-  else if(tab==='profile'&&profileUid){
-    const u=STATE.users[profileUid];
-    if(u) contentWrap.appendChild(renderProfile(u,false,()=>setState({tab:'explore',profileUid:null})));
-    else{ contentWrap.appendChild(Spinner()); fetchUserProfile(profileUid).then(()=>render()); }
-  }
-  center.appendChild(contentWrap);
-  layout.appendChild(center);
-
-  // ══ RIGHT PANEL — only on non-admin, non-video tabs ══
-  if(showRight){
-    const right = div({ width:'280px', flexShrink:0, padding:'16px', height:'100vh', overflowY:'auto', background:'#ede8e0' });
-
-    const srchBox = div({ background:'#faf7f3', borderRadius:'20px', padding:'10px 16px', display:'flex', gap:'8px', alignItems:'center', marginBottom:'20px' });
-    srchBox.appendChild(el('span',{style:{color:'#a09890',fontSize:'14px'}},'🔍'));
-    const srchInp = el('input',{type:'text',placeholder:'Rechercher...',style:{border:'none',outline:'none',background:'transparent',fontFamily:"'DM Sans',sans-serif",fontSize:'13px',color:'#2a2420',flex:1,width:'100%'}});
-    srchInp.addEventListener('input',e=>{ STATE.exploreSearch=e.target.value; filterExplore(null,suggestList,STATE.userProfile||{}); });
-    srchBox.appendChild(srchInp);
-    right.appendChild(srchBox);
-
-    right.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:'#a09890',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'12px'}},'Suggestions'));
-    const suggestList = div({});
-    const suggestions = Object.values(STATE.users).filter(u=>{
-      if(u.uid===STATE.currentUser?.uid||!u.handle) return false;
-      return !(me.followingIds||[]).includes(u.uid);
-    }).slice(0,6);
-    buildSuggestions(suggestList, suggestions, me);
-    right.appendChild(suggestList);
-
-    const statsBox = div({ background:'#faf7f3', borderRadius:'12px', padding:'16px', marginTop:'20px' });
-    statsBox.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',fontWeight:600,color:'#a09890',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'12px'}},'Statistiques'));
-    [['Publications',STATE.posts.length,'≡'],['Membres',Object.values(STATE.users).filter(u=>!u.isAdmin&&!u.isSuperAdmin).length,'◎']].forEach(([l,v,ic])=>{
-      const row = div({ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid #ede8e0' });
-      row.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a09890'}},ic+' '+l));
-      row.appendChild(el('span',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',fontWeight:600,color:'#2a2420'}},String(v)));
-      statsBox.appendChild(row);
-    });
-    right.appendChild(statsBox);
-    layout.appendChild(right);
-  }
-
-  // Toast
-  if(STATE.toast){
-    const t=div({position:'fixed',bottom:'24px',left:'50%',transform:'translateX(-50%)',background:STATE.toast.isErr?'#8a2010':'#2a2420',color:'#f5f0ea',padding:'10px 20px',borderRadius:'20px',fontFamily:"'DM Sans',sans-serif",fontSize:'13px',zIndex:999,whiteSpace:'nowrap',animation:'fadeIn 0.3s ease'},[STATE.toast.msg]);
-    layout.appendChild(t);
-  }
-
-  return layout;
 }
 
 function buildSuggestions(container, users, me) {
