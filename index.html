@@ -2134,6 +2134,256 @@ function renderMaintenance(){
   return root2;
 }
 
+// ── MOBILE APP SHELL ─────────────────────────────────────────────
+function renderApp(){
+  const me = STATE.userProfile||{};
+  const {tab, profileUid, editing} = STATE;
+  const app = document.createElement('div');
+  app.style.cssText = 'min-height:100vh;background:#f5f0ea;display:flex;justify-content:center;padding-bottom:80px;';
+  const shell = document.createElement('div');
+  shell.style.cssText = 'width:100%;max-width:560px;background:#faf7f3;min-height:100vh;box-shadow:0 0 60px rgba(42,36,32,0.06);display:flex;flex-direction:column;';
+
+  // Header
+  const hd = document.createElement('div');
+  hd.style.cssText = 'padding:14px 16px;border-bottom:1px solid #ede8e0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#faf7f3;z-index:10;flex-shrink:0;';
+  const logo = document.createElement('div');
+  logo.style.cssText = 'display:flex;align-items:baseline;gap:8px;';
+  const logoTxt = document.createElement('span');
+  logoTxt.style.cssText = "font-family:'Lora',serif;font-weight:500;font-size:21px;color:#2a2420;letter-spacing:-0.02em;";
+  logoTxt.textContent = 'Æther';
+  const logoSub = document.createElement('span');
+  logoSub.style.cssText = "font-family:'DM Sans',sans-serif;font-size:9px;color:#c5bfb8;text-transform:uppercase;letter-spacing:0.12em;";
+  logoSub.textContent = 'réseau';
+  logo.appendChild(logoTxt); logo.appendChild(logoSub);
+  hd.appendChild(logo);
+  const right = document.createElement('div');
+  right.style.cssText = 'display:flex;gap:10px;align-items:center;';
+  if(tab==='videos'){
+    const loupeActive = STATE.videoSearchOpen;
+    const loupe = document.createElement('div');
+    loupe.textContent = '🔍';
+    loupe.style.cssText = 'cursor:pointer;font-size:16px;padding:4px 8px;border-radius:8px;background:'+(loupeActive?'#ede8e0':'transparent')+';color:'+(loupeActive?'#2a2420':'#a09890')+';';
+    loupe.addEventListener('click',()=>{ STATE.videoSearchOpen=!STATE.videoSearchOpen; if(!STATE.videoSearchOpen) STATE.videoSearch=''; render(); });
+    right.appendChild(loupe);
+  }
+  if(me.handle){const s=document.createElement('span');s.style.cssText="font-family:'DM Sans',sans-serif;font-size:12px;color:#a09890;";s.textContent='@'+me.handle;right.appendChild(s);}
+  const deco = document.createElement('button');
+  deco.type='button'; deco.textContent='Déco';
+  deco.style.cssText = "background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;color:#c5bfb8;padding:0;";
+  deco.onclick = async()=>{
+    if(unsubPosts){unsubPosts();unsubPosts=null;}
+    if(unsubConv){unsubConv();unsubConv=null;}
+    if(unsubProfile){unsubProfile();unsubProfile=null;}
+    await signOut(auth);
+    STATE={...STATE,currentUser:null,userProfile:null,posts:[],users:{},tab:'feed',postsLoading:true};
+    render();
+  };
+  right.appendChild(deco);
+  hd.appendChild(right);
+  shell.appendChild(hd);
+
+  // Content
+  const content = document.createElement('div');
+  content.style.cssText = 'flex:1;overflow-y:auto;padding-bottom:72px;';
+  if(tab==='feed')           content.appendChild(renderFeed());
+  else if(tab==='explore')   content.appendChild(renderExplore());
+  else if(tab==='videos')    content.appendChild(renderVideos());
+  else if(tab==='messages')  content.appendChild(renderMessages());
+  else if(tab==='me'&&!editing) content.appendChild(renderProfile(me,true,()=>{}));
+  else if(tab==='me'&&editing)  content.appendChild(renderEditProfile());
+  else if(tab==='admin'&&(me.isAdmin||me.isSuperAdmin)) content.appendChild(renderAdmin());
+  else if(tab==='profile'&&profileUid){
+    const u=STATE.users[profileUid];
+    if(u) content.appendChild(renderProfile(u,false,()=>setState({tab:'explore',profileUid:null})));
+    else{ content.appendChild(Spinner()); fetchUserProfile(profileUid).then(()=>render()); }
+  }
+  shell.appendChild(content);
+
+  // Bottom nav
+  const NAV=[
+    {id:'feed',label:'Fil',icon:'≡'},
+    {id:'explore',label:'Explorer',icon:'◎'},
+    {id:'videos',label:'Vidéos',icon:'▶'},
+    {id:'messages',label:'Messages',icon:'◇'},
+    {id:'me',label:'Profil',icon:'○'},
+    ...((me.isAdmin||me.isSuperAdmin)?[{id:'admin',label:me.isSuperAdmin?'S.Admin':'Admin',icon:me.isSuperAdmin?'★':'◈'}]:[]),
+  ];
+  const nav = document.createElement('div');
+  nav.style.cssText = 'position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:#faf7f3;border-top:1px solid #ede8e0;display:flex;z-index:20;padding:6px 0;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px));';
+  NAV.forEach(item=>{
+    const active = tab===item.id||(tab==='profile'&&item.id==='explore');
+    const nb = document.createElement('button');
+    nb.type='button';
+    nb.style.cssText='flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;';
+    const icon=document.createElement('span');icon.textContent=item.icon;icon.style.cssText='font-size:17px;color:'+(active?'#2a2420':'#c5bfb8')+';transition:color 0.2s;pointer-events:none;';
+    const lbl=document.createElement('span');lbl.textContent=item.label;lbl.style.cssText="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:"+(active?'#2a2420':'#c5bfb8')+";transition:color 0.2s;pointer-events:none;";
+    nb.appendChild(icon);nb.appendChild(lbl);
+    nb.onclick=()=>{
+      STATE.editing=false;STATE.editForm=null;
+      if(item.id==='explore') getDocs(collection(db,'users')).then(snap=>{snap.forEach(d=>{STATE.users[d.id]={uid:d.id,...d.data()};});render();}).catch(()=>{});
+      else if(item.id==='videos'){STATE.videoIndex=0;STATE.videoShowComments=null;}
+      setState({tab:item.id});
+    };
+    nav.appendChild(nb);
+  });
+  shell.appendChild(nav);
+
+  // Toast
+  if(STATE.toast){
+    const t=document.createElement('div');
+    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:'+(STATE.toast.isErr?'#8a2010':'#2a2420')+';color:#f5f0ea;padding:10px 20px;border-radius:20px;font-family:"DM Sans",sans-serif;font-size:13px;z-index:50;white-space:nowrap;animation:fadeIn 0.3s ease;';
+    t.textContent=STATE.toast.msg;
+    shell.appendChild(t);
+  }
+  app.appendChild(shell);
+  return app;
+}
+
+// ── DESKTOP APP SHELL ─────────────────────────────────────────────
+function renderDesktop(){
+  const me = STATE.userProfile||{};
+  const {tab, profileUid, editing} = STATE;
+  const isAdmin = tab==='admin';
+  const isVideo = tab==='videos';
+  const showRight = !isAdmin && !isVideo;
+
+  const layout = document.createElement('div');
+  layout.style.cssText = 'display:flex;height:100vh;background:#ede8e0;overflow:hidden;';
+
+  // ── Sidebar ──
+  const sidebar = document.createElement('div');
+  sidebar.style.cssText = 'width:240px;flex-shrink:0;background:#faf7f3;border-right:1px solid #ede8e0;display:flex;flex-direction:column;height:100vh;overflow:hidden;';
+  const logoWrap = document.createElement('div');
+  logoWrap.style.cssText = 'padding:20px 24px;border-bottom:1px solid #ede8e0;';
+  const lt=document.createElement('div');lt.style.cssText="font-family:'Lora',serif;font-weight:500;font-size:26px;color:#2a2420;letter-spacing:-0.02em;";lt.textContent='Æther';
+  const ls=document.createElement('div');ls.style.cssText="font-family:'DM Sans',sans-serif;font-size:9px;color:#c5bfb8;text-transform:uppercase;letter-spacing:0.16em;margin-top:2px;";ls.textContent='réseau social';
+  logoWrap.appendChild(lt);logoWrap.appendChild(ls);sidebar.appendChild(logoWrap);
+
+  const NAV_ITEMS=[
+    {id:'feed',label:'Fil',icon:'≡'},
+    {id:'explore',label:'Explorer',icon:'◎'},
+    {id:'videos',label:'Vidéos',icon:'▶'},
+    {id:'messages',label:'Messages',icon:'◇'},
+    {id:'me',label:'Mon profil',icon:'○'},
+    ...((me.isAdmin||me.isSuperAdmin)?[{id:'admin',label:me.isSuperAdmin?'Super Admin':'Admin',icon:me.isSuperAdmin?'★':'◈'}]:[]),
+  ];
+  const navList=document.createElement('div');navList.style.cssText='padding:8px 12px;flex:1;overflow-y:auto;';
+  NAV_ITEMS.forEach(item=>{
+    const active=tab===item.id||(tab==='profile'&&item.id==='explore');
+    const isAdminItem=item.id==='admin';
+    const accentColor=me.isSuperAdmin?'#b8860b':'#c17a4a';
+    const nb=document.createElement('button');nb.type='button';
+    nb.style.cssText='width:100%;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;border:none;cursor:pointer;background:'+(active?'#f0ebe4':'transparent')+';margin-bottom:2px;text-align:left;';
+    nb.onmouseenter=()=>{if(!active)nb.style.background='#f5f0ea';};
+    nb.onmouseleave=()=>{if(!active)nb.style.background='transparent';};
+    const iconS=document.createElement('span');iconS.textContent=item.icon;iconS.style.cssText='font-size:18px;color:'+(active?(isAdminItem?accentColor:'#2a2420'):(isAdminItem?accentColor:'#a09890'))+';pointer-events:none;';
+    const lblS=document.createElement('span');lblS.textContent=item.label;lblS.style.cssText="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:"+(active?600:400)+";color:"+(active?(isAdminItem?accentColor:'#2a2420'):(isAdminItem?accentColor:'#a09890'))+";pointer-events:none;";
+    nb.appendChild(iconS);nb.appendChild(lblS);
+    nb.onclick=()=>{
+      STATE.editing=false;STATE.editForm=null;
+      if(item.id==='videos'){STATE.videoIndex=0;STATE.videoShowComments=null;}
+      setState({tab:item.id});
+    };
+    navList.appendChild(nb);
+  });
+  sidebar.appendChild(navList);
+
+  // User card
+  const uc=document.createElement('div');uc.style.cssText='margin:12px;padding:12px;border-radius:12px;background:#f0ebe4;display:flex;align-items:center;gap:10px;';
+  uc.appendChild(Avatar(me,36));
+  const uci=document.createElement('div');uci.style.flex='1';uci.style.minWidth='0';
+  const ucn=document.createElement('div');ucn.style.cssText='display:flex;align-items:center;gap:6px;';
+  const ucns=document.createElement('span');ucns.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#2a2420;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";ucns.textContent=me.displayName||'';
+  const ucgb=GradeBadge(me,true);
+  ucn.appendChild(ucns);if(ucgb)ucn.appendChild(ucgb);
+  uci.appendChild(ucn);
+  if(me.handle){const uhs=document.createElement('span');uhs.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;color:#a09890;";uhs.textContent='@'+me.handle;uci.appendChild(uhs);}
+  uc.appendChild(uci);
+  const lb=document.createElement('button');lb.type='button';lb.textContent='⇥';lb.title='Déconnexion';
+  lb.style.cssText='background:none;border:none;cursor:pointer;color:#c5bfb8;font-size:16px;padding:4px;flex-shrink:0;';
+  lb.onclick=async()=>{
+    if(unsubPosts){unsubPosts();unsubPosts=null;}
+    if(unsubConv){unsubConv();unsubConv=null;}
+    if(unsubProfile){unsubProfile();unsubProfile=null;}
+    await signOut(auth);
+    STATE={...STATE,currentUser:null,userProfile:null,posts:[],users:{},tab:'feed',postsLoading:true};
+    render();
+  };
+  uc.appendChild(lb);sidebar.appendChild(uc);layout.appendChild(sidebar);
+
+  // ── Center ──
+  const center=document.createElement('div');
+  center.style.cssText='flex:1;min-width:0;height:100vh;overflow-y:'+(isVideo?'hidden':'auto')+';background:'+(isVideo?'#000':'#faf7f3')+';border-right:'+(showRight?'1px solid #ede8e0':'none')+';display:flex;flex-direction:column;position:relative;';
+
+  if(!isVideo){
+    const mhd=document.createElement('div');
+    mhd.style.cssText='padding:16px 24px;border-bottom:1px solid #ede8e0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#faf7f3;z-index:5;flex-shrink:0;';
+    const titles={feed:"Fil d'actualité",explore:'Explorer',messages:'Messages',me:'Mon profil',admin:'Administration',profile:'Profil',videos:'Vidéos'};
+    const tt=document.createElement('span');tt.style.cssText="font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;color:#2a2420;";tt.textContent=titles[tab]||'Æther';
+    mhd.appendChild(tt);center.appendChild(mhd);
+  } else {
+    const vidHd=document.createElement('div');
+    vidHd.style.cssText='padding:12px 20px;display:flex;align-items:center;justify-content:flex-end;position:absolute;top:0;left:0;right:0;z-index:20;pointer-events:none;';
+    const lb2=document.createElement('button');lb2.type='button';lb2.textContent='🔍';
+    lb2.style.cssText='background:rgba(0,0,0,0.4);border:none;border-radius:20px;padding:6px 12px;cursor:pointer;font-size:16px;color:#fff;pointer-events:all;';
+    lb2.onclick=()=>{ STATE.videoSearchOpen=!STATE.videoSearchOpen; if(!STATE.videoSearchOpen) STATE.videoSearch=''; render(); };
+    vidHd.appendChild(lb2);center.appendChild(vidHd);
+  }
+
+  const cw=document.createElement('div');cw.style.flex='1';
+  if(tab==='feed')           cw.appendChild(renderFeed());
+  else if(tab==='explore')   cw.appendChild(renderExplore());
+  else if(tab==='videos')    cw.appendChild(renderVideos());
+  else if(tab==='messages')  cw.appendChild(renderMessages());
+  else if(tab==='me'&&!editing) cw.appendChild(renderProfile(me,true,()=>{}));
+  else if(tab==='me'&&editing)  cw.appendChild(renderEditProfile());
+  else if(tab==='admin'&&(me.isAdmin||me.isSuperAdmin)) cw.appendChild(renderAdmin());
+  else if(tab==='profile'&&profileUid){
+    const u=STATE.users[profileUid];
+    if(u) cw.appendChild(renderProfile(u,false,()=>setState({tab:'explore',profileUid:null})));
+    else{ cw.appendChild(Spinner()); fetchUserProfile(profileUid).then(()=>render()); }
+  }
+  center.appendChild(cw);layout.appendChild(center);
+
+  // ── Right panel ──
+  if(showRight){
+    const right=document.createElement('div');
+    right.style.cssText='width:280px;flex-shrink:0;padding:16px;height:100vh;overflow-y:auto;background:#ede8e0;';
+    const sb=document.createElement('div');sb.style.cssText='background:#faf7f3;border-radius:20px;padding:10px 16px;display:flex;gap:8px;align-items:center;margin-bottom:20px;';
+    const si=document.createElement('span');si.style.cssText='color:#a09890;font-size:14px;';si.textContent='🔍';
+    const sinp=document.createElement('input');sinp.type='text';sinp.placeholder='Rechercher...';
+    sinp.style.cssText="border:none;outline:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:#2a2420;flex:1;width:100%;";
+    const suggestList=document.createElement('div');
+    sinp.addEventListener('input',e=>{ STATE.exploreSearch=e.target.value; filterExplore(null,suggestList,STATE.userProfile||{}); });
+    sb.appendChild(si);sb.appendChild(sinp);right.appendChild(sb);
+    const suglbl=document.createElement('div');suglbl.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:#a09890;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;";suglbl.textContent='Suggestions';
+    right.appendChild(suglbl);
+    const suggestions=Object.values(STATE.users).filter(u=>u.uid!==STATE.currentUser?.uid&&u.handle&&!(me.followingIds||[]).includes(u.uid)).slice(0,6);
+    buildSuggestions(suggestList,suggestions,me);
+    right.appendChild(suggestList);
+    const statsBox=document.createElement('div');statsBox.style.cssText='background:#faf7f3;border-radius:12px;padding:16px;margin-top:20px;';
+    const stlbl=document.createElement('div');stlbl.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:#a09890;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;";stlbl.textContent='Statistiques';
+    statsBox.appendChild(stlbl);
+    [['Publications',STATE.posts.length,'≡'],['Membres',Object.values(STATE.users).filter(u=>!u.isAdmin&&!u.isSuperAdmin).length,'◎']].forEach(([l,v,ic])=>{
+      const row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #ede8e0;';
+      const ls2=document.createElement('span');ls2.style.cssText="font-family:'DM Sans',sans-serif;font-size:12px;color:#a09890;";ls2.textContent=ic+' '+l;
+      const vs=document.createElement('span');vs.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#2a2420;";vs.textContent=String(v);
+      row.appendChild(ls2);row.appendChild(vs);statsBox.appendChild(row);
+    });
+    right.appendChild(statsBox);layout.appendChild(right);
+  }
+
+  // Toast
+  if(STATE.toast){
+    const t=document.createElement('div');
+    t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(STATE.toast.isErr?'#8a2010':'#2a2420')+';color:#f5f0ea;padding:10px 20px;border-radius:20px;font-family:"DM Sans",sans-serif;font-size:13px;z-index:999;white-space:nowrap;animation:fadeIn 0.3s ease;';
+    t.textContent=STATE.toast.msg;
+    layout.appendChild(t);
+  }
+  return layout;
+}
+
+
 function render(){
   const root=document.getElementById('root');
   root.innerHTML='';
