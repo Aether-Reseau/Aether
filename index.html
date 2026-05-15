@@ -2247,40 +2247,75 @@ function renderDesktop(){
   const isVideo = tab==='videos';
   const showRight = !isAdmin && !isVideo;
 
+  // ── Layout wrapper ──
   const layout = document.createElement('div');
-  layout.style.cssText = 'display:flex;height:100vh;background:#ede8e0;overflow:hidden;';
+  layout.style.cssText = 'display:flex;height:100vh;background:#f5f0ea;overflow:hidden;font-family:"DM Sans",sans-serif;';
 
-  // ── Sidebar ──
+  // ══════════════════════════════════════════════
+  // LEFT SIDEBAR
+  // ══════════════════════════════════════════════
   const sidebar = document.createElement('div');
-  sidebar.style.cssText = 'width:240px;flex-shrink:0;background:#faf7f3;border-right:1px solid #ede8e0;display:flex;flex-direction:column;height:100vh;overflow:hidden;';
-  const logoWrap = document.createElement('div');
-  logoWrap.style.cssText = 'padding:20px 24px;border-bottom:1px solid #ede8e0;';
-  const lt=document.createElement('div');lt.style.cssText="font-family:'Lora',serif;font-weight:500;font-size:26px;color:#2a2420;letter-spacing:-0.02em;";lt.textContent='Æther';
-  const ls=document.createElement('div');ls.style.cssText="font-family:'DM Sans',sans-serif;font-size:9px;color:#c5bfb8;text-transform:uppercase;letter-spacing:0.16em;margin-top:2px;";ls.textContent='réseau social';
-  logoWrap.appendChild(lt);logoWrap.appendChild(ls);sidebar.appendChild(logoWrap);
+  sidebar.style.cssText = 'width:260px;flex-shrink:0;background:#faf7f3;border-right:1px solid #ede8e0;display:flex;flex-direction:column;height:100vh;overflow:hidden;';
 
-  const NAV_ITEMS=[
-    {id:'feed',label:'Fil',icon:'≡'},
-    {id:'explore',label:'Explorer',icon:'◎'},
-    {id:'videos',label:'Vidéos',icon:'▶'},
-    {id:'messages',label:'Messages',icon:'◇'},
-    {id:'me',label:'Mon profil',icon:'○'},
+  // Logo
+  const logoWrap = document.createElement('div');
+  logoWrap.style.cssText = 'padding:24px 24px 20px;';
+  const lt = document.createElement('div');
+  lt.style.cssText = "font-family:'Lora',serif;font-weight:500;font-size:28px;color:#2a2420;letter-spacing:-0.03em;line-height:1;";
+  lt.textContent = 'Æther';
+  const ls = document.createElement('div');
+  ls.style.cssText = "font-family:'DM Sans',sans-serif;font-size:9px;color:#c5bfb8;text-transform:uppercase;letter-spacing:0.2em;margin-top:3px;";
+  ls.textContent = 'réseau';
+  logoWrap.appendChild(lt); logoWrap.appendChild(ls);
+  sidebar.appendChild(logoWrap);
+
+  // Nav items
+  const NAV_ITEMS = [
+    {id:'feed',    label:'Accueil',   icon:'⌂'},
+    {id:'explore', label:'Explorer',  icon:'◎'},
+    {id:'videos',  label:'Vidéos',    icon:'▶'},
+    {id:'messages',label:'Messages',  icon:'✉'},
+    {id:'me',      label:'Profil',    icon:'◯'},
     ...((me.isAdmin||me.isSuperAdmin)?[{id:'admin',label:me.isSuperAdmin?'Super Admin':'Admin',icon:me.isSuperAdmin?'★':'◈'}]:[]),
   ];
-  const navList=document.createElement('div');navList.style.cssText='padding:8px 12px;flex:1;overflow-y:auto;';
-  NAV_ITEMS.forEach(item=>{
-    const active=tab===item.id||(tab==='profile'&&item.id==='explore');
-    const isAdminItem=item.id==='admin';
-    const accentColor=me.isSuperAdmin?'#b8860b':'#c17a4a';
-    const nb=document.createElement('button');nb.type='button';
-    nb.style.cssText='width:100%;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;border:none;cursor:pointer;background:'+(active?'#f0ebe4':'transparent')+';margin-bottom:2px;text-align:left;';
-    nb.onmouseenter=()=>{if(!active)nb.style.background='#f5f0ea';};
-    nb.onmouseleave=()=>{if(!active)nb.style.background='transparent';};
-    const iconS=document.createElement('span');iconS.textContent=item.icon;iconS.style.cssText='font-size:18px;color:'+(active?(isAdminItem?accentColor:'#2a2420'):(isAdminItem?accentColor:'#a09890'))+';pointer-events:none;';
-    const lblS=document.createElement('span');lblS.textContent=item.label;lblS.style.cssText="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:"+(active?600:400)+";color:"+(active?(isAdminItem?accentColor:'#2a2420'):(isAdminItem?accentColor:'#a09890'))+";pointer-events:none;";
-    nb.appendChild(iconS);nb.appendChild(lblS);
-    nb.onclick=()=>{
-      STATE.editing=false;STATE.editForm=null;
+  const navList = document.createElement('div');
+  navList.style.cssText = 'padding:4px 12px;flex:1;overflow-y:auto;';
+
+  NAV_ITEMS.forEach(item => {
+    const active = tab===item.id||(tab==='profile'&&item.id==='explore');
+    const isAdminItem = item.id==='admin';
+    const accentColor = me.isSuperAdmin?'#b8860b':'#c17a4a';
+
+    const nb = document.createElement('button');
+    nb.type = 'button';
+    nb.style.cssText = 'width:100%;display:flex;align-items:center;gap:14px;padding:11px 16px;border-radius:14px;border:none;cursor:pointer;background:'+(active?'#f0ebe4':'transparent')+';margin-bottom:2px;text-align:left;transition:background 0.15s;';
+    nb.onmouseenter = () => { if(!active) nb.style.background='#f5f0ea'; };
+    nb.onmouseleave = () => { if(!active) nb.style.background='transparent'; };
+
+    const iconS = document.createElement('span');
+    iconS.textContent = item.icon;
+    iconS.style.cssText = 'font-size:19px;color:'+(active?(isAdminItem?accentColor:'#2a2420'):(isAdminItem?accentColor:'#a09890'))+';width:24px;text-align:center;flex-shrink:0;pointer-events:none;';
+    const lblS = document.createElement('span');
+    lblS.textContent = item.label;
+    lblS.style.cssText = 'font-size:15px;font-weight:'+(active?600:400)+';color:'+(active?(isAdminItem?accentColor:'#2a2420'):(isAdminItem?accentColor:'#7a7068'))+';pointer-events:none;';
+
+    // Messages badge
+    if(item.id==='messages'){
+      const unreadTotal = Object.values(STATE.msgConvs||{}).reduce((s,c)=>s+(c.messages||[]).filter(m=>m.senderId!==STATE.currentUser?.uid&&!m.read).length,0);
+      if(unreadTotal>0){
+        const badge=document.createElement('span');
+        badge.style.cssText='margin-left:auto;background:#c17a4a;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;pointer-events:none;';
+        badge.textContent=String(unreadTotal);
+        nb.appendChild(iconS); nb.appendChild(lblS); nb.appendChild(badge);
+      } else {
+        nb.appendChild(iconS); nb.appendChild(lblS);
+      }
+    } else {
+      nb.appendChild(iconS); nb.appendChild(lblS);
+    }
+
+    nb.onclick = () => {
+      STATE.editing=false; STATE.editForm=null;
       if(item.id==='videos'){STATE.videoIndex=0;STATE.videoShowComments=null;}
       setState({tab:item.id});
     };
@@ -2288,19 +2323,46 @@ function renderDesktop(){
   });
   sidebar.appendChild(navList);
 
-  // User card
-  const uc=document.createElement('div');uc.style.cssText='margin:12px;padding:12px;border-radius:12px;background:#f0ebe4;display:flex;align-items:center;gap:10px;';
-  uc.appendChild(Avatar(me,36));
-  const uci=document.createElement('div');uci.style.flex='1';uci.style.minWidth='0';
-  const ucn=document.createElement('div');ucn.style.cssText='display:flex;align-items:center;gap:6px;';
-  const ucns=document.createElement('span');ucns.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#2a2420;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";ucns.textContent=me.displayName||'';
-  const ucgb=GradeBadge(me,true);
-  ucn.appendChild(ucns);if(ucgb)ucn.appendChild(ucgb);
+  // Create post button
+  const createBtn = document.createElement('button');
+  createBtn.type = 'button';
+  createBtn.style.cssText = 'margin:12px 16px;padding:13px 20px;background:#2a2420;color:#f5f0ea;border:none;border-radius:14px;cursor:pointer;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;justify-content:center;transition:opacity 0.2s;';
+  createBtn.innerHTML = '<span style="font-size:16px;pointer-events:none">✎</span><span style="pointer-events:none">Créer un post</span>';
+  createBtn.onmouseenter = () => createBtn.style.opacity='0.85';
+  createBtn.onmouseleave = () => createBtn.style.opacity='1';
+  createBtn.onclick = () => setState({tab:'feed'});
+
+  // Premium card
+  const premCard = document.createElement('div');
+  premCard.style.cssText = 'margin:0 16px 16px;padding:16px;background:linear-gradient(135deg,#fdf8ef 0%,#f5f0ea 100%);border:1px solid #e8dfd5;border-radius:14px;text-align:center;';
+  const premIcon = document.createElement('div');
+  premIcon.style.cssText = 'font-size:20px;margin-bottom:6px;';
+  premIcon.textContent = '✦';
+  const premTitle = document.createElement('div');
+  premTitle.style.cssText = "font-size:13px;font-weight:600;color:#2a2420;margin-bottom:4px;";
+  premTitle.innerHTML = 'Æther <span style="color:#c17a4a">Premium</span>';
+  const premDesc = document.createElement('div');
+  premDesc.style.cssText = "font-size:11px;color:#a09890;margin-bottom:12px;line-height:1.5;";
+  premDesc.textContent = "Profitez d'une expérience sans limites.";
+  const premBtn = document.createElement('button');
+  premBtn.type='button'; premBtn.textContent='Découvrir';
+  premBtn.style.cssText='width:100%;padding:8px;background:#f5f0ea;border:1px solid #d5cfc8;border-radius:10px;cursor:pointer;font-size:12px;font-weight:500;color:#2a2420;';
+  premCard.appendChild(premIcon); premCard.appendChild(premTitle); premCard.appendChild(premDesc); premCard.appendChild(premBtn);
+
+  // User card at bottom
+  const uc = document.createElement('div');
+  uc.style.cssText = 'padding:14px 16px;border-top:1px solid #ede8e0;display:flex;align-items:center;gap:10px;';
+  uc.appendChild(Avatar(me,38));
+  const uci = document.createElement('div'); uci.style.flex='1'; uci.style.minWidth='0';
+  const ucn = document.createElement('div'); ucn.style.cssText='display:flex;align-items:center;gap:6px;';
+  const ucns = document.createElement('span'); ucns.style.cssText='font-size:13px;font-weight:600;color:#2a2420;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'; ucns.textContent=me.displayName||'';
+  ucn.appendChild(ucns);
+  const ucgb=GradeBadge(me,true); if(ucgb) ucn.appendChild(ucgb);
   uci.appendChild(ucn);
-  if(me.handle){const uhs=document.createElement('span');uhs.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;color:#a09890;";uhs.textContent='@'+me.handle;uci.appendChild(uhs);}
+  if(me.handle){const uhs=document.createElement('span');uhs.style.cssText='font-size:11px;color:#a09890;';uhs.textContent='@'+me.handle;uci.appendChild(uhs);}
   uc.appendChild(uci);
-  const lb=document.createElement('button');lb.type='button';lb.textContent='⇥';lb.title='Déconnexion';
-  lb.style.cssText='background:none;border:none;cursor:pointer;color:#c5bfb8;font-size:16px;padding:4px;flex-shrink:0;';
+  const lb=document.createElement('button'); lb.type='button'; lb.textContent='⇥'; lb.title='Déconnexion';
+  lb.style.cssText='background:none;border:none;cursor:pointer;color:#c5bfb8;font-size:18px;padding:4px;flex-shrink:0;';
   lb.onclick=async()=>{
     if(unsubPosts){unsubPosts();unsubPosts=null;}
     if(unsubConv){unsubConv();unsubConv=null;}
@@ -2309,28 +2371,74 @@ function renderDesktop(){
     STATE={...STATE,currentUser:null,userProfile:null,posts:[],users:{},tab:'feed',postsLoading:true};
     render();
   };
-  uc.appendChild(lb);sidebar.appendChild(uc);layout.appendChild(sidebar);
+  uc.appendChild(lb);
 
-  // ── Center ──
-  const center=document.createElement('div');
-  center.style.cssText='flex:1;min-width:0;height:100vh;overflow-y:'+(isVideo?'hidden':'auto')+';background:'+(isVideo?'#000':'#faf7f3')+';border-right:'+(showRight?'1px solid #ede8e0':'none')+';display:flex;flex-direction:column;position:relative;';
+  sidebar.appendChild(createBtn);
+  sidebar.appendChild(premCard);
+  sidebar.appendChild(uc);
+  layout.appendChild(sidebar);
+
+  // ══════════════════════════════════════════════
+  // CENTER
+  // ══════════════════════════════════════════════
+  const center = document.createElement('div');
+  center.style.cssText = 'flex:1;min-width:0;height:100vh;overflow-y:'+(isVideo?'hidden':'auto')+';background:'+(isVideo?'#000':'#faf7f3')+';display:flex;flex-direction:column;position:relative;';
 
   if(!isVideo){
-    const mhd=document.createElement('div');
-    mhd.style.cssText='padding:16px 24px;border-bottom:1px solid #ede8e0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#faf7f3;z-index:5;flex-shrink:0;';
-    const titles={feed:"Fil d'actualité",explore:'Explorer',messages:'Messages',me:'Mon profil',admin:'Administration',profile:'Profil',videos:'Vidéos'};
-    const tt=document.createElement('span');tt.style.cssText="font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;color:#2a2420;";tt.textContent=titles[tab]||'Æther';
-    mhd.appendChild(tt);center.appendChild(mhd);
+    // Top bar with search
+    const topBar = document.createElement('div');
+    topBar.style.cssText = 'padding:16px 24px;border-bottom:1px solid #ede8e0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#faf7f3;z-index:5;flex-shrink:0;gap:16px;';
+
+    // Search bar
+    const searchWrap = document.createElement('div');
+    searchWrap.style.cssText = 'flex:1;max-width:480px;display:flex;align-items:center;gap:10px;background:#f0ebe4;border-radius:24px;padding:9px 18px;';
+    const searchIcon = document.createElement('span'); searchIcon.textContent='🔍'; searchIcon.style.cssText='font-size:14px;color:#a09890;flex-shrink:0;';
+    const searchInp = document.createElement('input'); searchInp.type='text'; searchInp.placeholder='Rechercher sur Æther...';
+    searchInp.style.cssText='border:none;outline:none;background:transparent;font-size:14px;color:#2a2420;flex:1;width:100%;';
+    const suggestList2 = document.createElement('div');
+    searchInp.addEventListener('input',e=>{ STATE.exploreSearch=e.target.value; if(STATE.tab==='explore') filterExplore(null,suggestList2,STATE.userProfile||{}); });
+    searchWrap.appendChild(searchIcon); searchWrap.appendChild(searchInp);
+    topBar.appendChild(searchWrap);
+
+    // Right icons in topbar
+    const topRight = document.createElement('div');
+    topRight.style.cssText = 'display:flex;gap:8px;align-items:center;flex-shrink:0;';
+
+    // Theme icon (decorative)
+    const themeBtn = document.createElement('button'); themeBtn.type='button'; themeBtn.textContent='☀';
+    themeBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:18px;color:#a09890;padding:6px;border-radius:10px;';
+    themeBtn.title='Thème';
+
+    // Messages icon
+    const msgBtn = document.createElement('button'); msgBtn.type='button'; msgBtn.textContent='✉';
+    msgBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:18px;color:#a09890;padding:6px;border-radius:10px;position:relative;';
+    msgBtn.onclick=()=>setState({tab:'messages'});
+
+    // Notif icon (decorative)
+    const notifBtn = document.createElement('button'); notifBtn.type='button'; notifBtn.textContent='🔔';
+    notifBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:16px;color:#a09890;padding:6px;border-radius:10px;';
+
+    // User avatar
+    const userAv = document.createElement('div'); userAv.style.cssText='display:flex;align-items:center;gap:8px;padding:4px 10px;border-radius:20px;cursor:pointer;background:#f5f0ea;';
+    userAv.appendChild(Avatar(me,30));
+    const uavN=document.createElement('span'); uavN.style.cssText='font-size:13px;font-weight:500;color:#2a2420;'; uavN.textContent=me.displayName||'';
+    const uavArrow=document.createElement('span'); uavArrow.style.cssText='font-size:10px;color:#a09890;'; uavArrow.textContent='∨';
+    userAv.appendChild(uavN); userAv.appendChild(uavArrow);
+    userAv.addEventListener('click',()=>setState({tab:'me'}));
+
+    topRight.appendChild(themeBtn); topRight.appendChild(msgBtn); topRight.appendChild(notifBtn); topRight.appendChild(userAv);
+    topBar.appendChild(topRight);
+    center.appendChild(topBar);
   } else {
     const vidHd=document.createElement('div');
-    vidHd.style.cssText='padding:12px 20px;display:flex;align-items:center;justify-content:flex-end;position:absolute;top:0;left:0;right:0;z-index:20;pointer-events:none;';
-    const lb2=document.createElement('button');lb2.type='button';lb2.textContent='🔍';
-    lb2.style.cssText='background:rgba(0,0,0,0.4);border:none;border-radius:20px;padding:6px 12px;cursor:pointer;font-size:16px;color:#fff;pointer-events:all;';
+    vidHd.style.cssText='position:absolute;top:12px;right:16px;z-index:20;';
+    const lb2=document.createElement('button'); lb2.type='button'; lb2.textContent='🔍';
+    lb2.style.cssText='background:rgba(0,0,0,0.4);border:none;border-radius:20px;padding:6px 12px;cursor:pointer;font-size:16px;color:#fff;';
     lb2.onclick=()=>{ STATE.videoSearchOpen=!STATE.videoSearchOpen; if(!STATE.videoSearchOpen) STATE.videoSearch=''; render(); };
-    vidHd.appendChild(lb2);center.appendChild(vidHd);
+    vidHd.appendChild(lb2); center.appendChild(vidHd);
   }
 
-  const cw=document.createElement('div');cw.style.flex='1';
+  const cw = document.createElement('div'); cw.style.flex='1';
   if(tab==='feed')           cw.appendChild(renderFeed());
   else if(tab==='explore')   cw.appendChild(renderExplore());
   else if(tab==='videos')    cw.appendChild(renderVideos());
@@ -2343,42 +2451,98 @@ function renderDesktop(){
     if(u) cw.appendChild(renderProfile(u,false,()=>setState({tab:'explore',profileUid:null})));
     else{ cw.appendChild(Spinner()); fetchUserProfile(profileUid).then(()=>render()); }
   }
-  center.appendChild(cw);layout.appendChild(center);
+  center.appendChild(cw); layout.appendChild(center);
 
-  // ── Right panel ──
+  // ══════════════════════════════════════════════
+  // RIGHT PANEL
+  // ══════════════════════════════════════════════
   if(showRight){
-    const right=document.createElement('div');
-    right.style.cssText='width:280px;flex-shrink:0;padding:16px;height:100vh;overflow-y:auto;background:#ede8e0;';
-    const sb=document.createElement('div');sb.style.cssText='background:#faf7f3;border-radius:20px;padding:10px 16px;display:flex;gap:8px;align-items:center;margin-bottom:20px;';
-    const si=document.createElement('span');si.style.cssText='color:#a09890;font-size:14px;';si.textContent='🔍';
-    const sinp=document.createElement('input');sinp.type='text';sinp.placeholder='Rechercher...';
-    sinp.style.cssText="border:none;outline:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:#2a2420;flex:1;width:100%;";
-    const suggestList=document.createElement('div');
-    sinp.addEventListener('input',e=>{ STATE.exploreSearch=e.target.value; filterExplore(null,suggestList,STATE.userProfile||{}); });
-    sb.appendChild(si);sb.appendChild(sinp);right.appendChild(sb);
-    const suglbl=document.createElement('div');suglbl.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:#a09890;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;";suglbl.textContent='Suggestions';
-    right.appendChild(suglbl);
-    const suggestions=Object.values(STATE.users).filter(u=>u.uid!==STATE.currentUser?.uid&&u.handle&&!(me.followingIds||[]).includes(u.uid)).slice(0,6);
-    buildSuggestions(suggestList,suggestions,me);
-    right.appendChild(suggestList);
-    const statsBox=document.createElement('div');statsBox.style.cssText='background:#faf7f3;border-radius:12px;padding:16px;margin-top:20px;';
-    const stlbl=document.createElement('div');stlbl.style.cssText="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:#a09890;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;";stlbl.textContent='Statistiques';
+    const right = document.createElement('div');
+    right.style.cssText = 'width:300px;flex-shrink:0;height:100vh;overflow-y:auto;background:#faf7f3;border-left:1px solid #ede8e0;padding:20px 16px;';
+
+    // Suggestions
+    const sugHdr = document.createElement('div');
+    sugHdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;';
+    const sugTtl=document.createElement('span');sugTtl.style.cssText='font-size:15px;font-weight:700;color:#2a2420;';sugTtl.textContent='Suggestions';
+    const sugAll=document.createElement('span');sugAll.style.cssText='font-size:12px;color:#c17a4a;cursor:pointer;';sugAll.textContent='Voir tout';
+    sugAll.onclick=()=>setState({tab:'explore'});
+    sugHdr.appendChild(sugTtl); sugHdr.appendChild(sugAll);
+    right.appendChild(sugHdr);
+
+    const suggestList3 = document.createElement('div');
+    const suggestions=Object.values(STATE.users).filter(u=>u.uid!==STATE.currentUser?.uid&&u.handle&&!(me.followingIds||[]).includes(u.uid)).slice(0,4);
+    suggestions.forEach(u=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0ebe4;';
+      row.appendChild(Avatar(u,36));
+      const info=document.createElement('div'); info.style.flex='1'; info.style.minWidth='0';
+      const dn=document.createElement('div');dn.style.cssText='font-size:13px;font-weight:600;color:#2a2420;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';dn.textContent=u.displayName||'';
+      const hn=document.createElement('div');hn.style.cssText='font-size:11px;color:#a09890;';hn.textContent='@'+(u.handle||'');
+      info.appendChild(dn); info.appendChild(hn);
+      row.appendChild(info);
+      const followed=(me.followingIds||[]).includes(u.uid);
+      const fb=document.createElement('button'); fb.type='button'; fb.textContent=followed?'✓':'Suivre';
+      fb.style.cssText='background:'+(followed?'#2a2420':'none')+';color:'+(followed?'#fff':'#2a2420')+';border:1px solid '+(followed?'#2a2420':'#d5cfc8')+';padding:5px 12px;border-radius:20px;font-size:11px;cursor:pointer;font-weight:500;flex-shrink:0;white-space:nowrap;';
+      const closeX=document.createElement('span');closeX.textContent='×';closeX.style.cssText='color:#c5bfb8;cursor:pointer;font-size:16px;flex-shrink:0;padding:0 4px;';
+      fb.onclick=async(e)=>{
+        e.stopPropagation();
+        const myRef=doc(db,'users',STATE.currentUser.uid);
+        const thRef=doc(db,'users',u.uid);
+        try{
+          await updateDoc(myRef,{following:increment(1),followingIds:arrayUnion(u.uid)});
+          await updateDoc(thRef,{followers:increment(1)});
+          const thSnap=await getDoc(thRef); if(thSnap.exists()) STATE.users[u.uid]={uid:u.uid,...thSnap.data()};
+          render();
+        }catch(err){console.error(err);}
+      };
+      row.appendChild(fb); row.appendChild(closeX);
+      suggestList3.appendChild(row);
+    });
+    if(!suggestions.length){
+      const noSug=document.createElement('p');noSug.style.cssText="font-size:12px;color:#c5bfb8;font-style:italic;font-family:'Lora',serif;";noSug.textContent='Aucune suggestion.';
+      suggestList3.appendChild(noSug);
+    }
+    right.appendChild(suggestList3);
+
+    // Tendances (hashtags from post content)
+    const trendsMap = {};
+    STATE.posts.forEach(p=>{
+      const matches=(p.content||'').match(/#[\wÀ-ž]+/g)||[];
+      matches.forEach(tag=>{ trendsMap[tag]=(trendsMap[tag]||0)+1; });
+    });
+    const trends=Object.entries(trendsMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    if(trends.length){
+      const tHdr=document.createElement('div');tHdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin:24px 0 14px;';
+      const tTtl=document.createElement('span');tTtl.style.cssText='font-size:15px;font-weight:700;color:#2a2420;';tTtl.textContent='Tendances';
+      const tAll=document.createElement('span');tAll.style.cssText='font-size:12px;color:#c17a4a;cursor:pointer;';tAll.textContent='Voir tout';
+      tHdr.appendChild(tTtl);tHdr.appendChild(tAll);right.appendChild(tHdr);
+      trends.forEach(([tag,count])=>{
+        const tr=document.createElement('div');tr.style.cssText='padding:8px 0;border-bottom:1px solid #f0ebe4;cursor:pointer;';
+        const tn=document.createElement('div');tn.style.cssText='font-size:13px;font-weight:600;color:#2a2420;';tn.textContent=tag;
+        const tc=document.createElement('div');tc.style.cssText='font-size:11px;color:#a09890;margin-top:2px;';tc.textContent=count+' publication'+(count>1?'s':'');
+        tr.appendChild(tn);tr.appendChild(tc);right.appendChild(tr);
+      });
+    }
+
+    // Stats
+    const statsBox=document.createElement('div');statsBox.style.cssText='background:#f5f0ea;border-radius:14px;padding:16px;margin-top:20px;';
+    const stlbl=document.createElement('div');stlbl.style.cssText='font-size:11px;font-weight:600;color:#a09890;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;';stlbl.textContent='Statistiques';
     statsBox.appendChild(stlbl);
     [['Publications',STATE.posts.length,'≡'],['Membres',Object.values(STATE.users).filter(u=>!u.isAdmin&&!u.isSuperAdmin).length,'◎']].forEach(([l,v,ic])=>{
       const row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #ede8e0;';
-      const ls2=document.createElement('span');ls2.style.cssText="font-family:'DM Sans',sans-serif;font-size:12px;color:#a09890;";ls2.textContent=ic+' '+l;
-      const vs=document.createElement('span');vs.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#2a2420;";vs.textContent=String(v);
+      const ls2=document.createElement('span');ls2.style.cssText='font-size:12px;color:#a09890;';ls2.textContent=ic+' '+l;
+      const vs=document.createElement('span');vs.style.cssText='font-size:13px;font-weight:600;color:#2a2420;';vs.textContent=String(v);
       row.appendChild(ls2);row.appendChild(vs);statsBox.appendChild(row);
     });
-    right.appendChild(statsBox);layout.appendChild(right);
+    right.appendChild(statsBox);
+    layout.appendChild(right);
   }
 
   // Toast
   if(STATE.toast){
     const t=document.createElement('div');
     t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(STATE.toast.isErr?'#8a2010':'#2a2420')+';color:#f5f0ea;padding:10px 20px;border-radius:20px;font-family:"DM Sans",sans-serif;font-size:13px;z-index:999;white-space:nowrap;animation:fadeIn 0.3s ease;';
-    t.textContent=STATE.toast.msg;
-    layout.appendChild(t);
+    t.textContent=STATE.toast.msg;layout.appendChild(t);
   }
   return layout;
 }
