@@ -301,6 +301,7 @@ let STATE = {
   composeMedia:null,
   openComments:{},
   commentTexts:{},
+  profileTab:"Publications",
   playingVideo:null,
   exploreSearch:'',
   videoSearch:'',
@@ -408,399 +409,362 @@ function subscribeToProfile(uid){
 // AUTH SCREEN
 // ══════════════════════════════════════════════════════════════════
 function renderAuth(){
-  const {authMode:mode,authStep:step,authForm:f,authErrors:err,authDone:done,authLoading:loading}=STATE;
-  const setF=(k,v)=>{
-    STATE.authForm={...STATE.authForm,[k]:v};
-    // Only re-render for non-text fields (checkboxes, selects)
-    // For text fields, just update state silently
-  };
+  const {authStep=1,authMode='login',authErrors={},authLoading=false,authForm:f={}} = STATE;
+  const setF = (k,v) => { STATE.authForm={...(STATE.authForm||{})}; STATE.authForm[k]=v; };
 
-  const wrap=div({minHeight:'100vh',background:'#f5f0ea',display:'flex',justifyContent:'center',alignItems:'center',padding:'20px'});
-  const card=div({width:'100%',maxWidth:'400px',background:'#faf7f3',padding:'40px 32px',boxShadow:'0 4px 40px rgba(42,36,32,0.09)',animation:'fadeIn 0.5s ease'});
+  const root=document.createElement('div');
+  root.style.cssText='min-height:100vh;background:#f5f0ea;display:flex;align-items:center;justify-content:center;padding:20px;';
+
+  const card=document.createElement('div');
+  card.style.cssText='background:#fff;border-radius:20px;padding:36px 32px;width:100%;max-width:420px;box-shadow:0 4px 40px rgba(42,36,32,0.08);';
 
   // Logo
-  card.appendChild(div({textAlign:'center',marginBottom:'36px'},[
-    el('div',{style:{fontFamily:"'Lora',serif",fontWeight:500,fontSize:'32px',color:'#2a2420',letterSpacing:'-0.03em'}},'Æther'),
-    el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'10px',color:'#c5bfb8',textTransform:'uppercase',letterSpacing:'0.18em',marginTop:'4px'}},'réseau social')
-  ]));
+  const logoWrap=document.createElement('div');logoWrap.style.cssText='text-align:center;margin-bottom:28px;';
+  const logo=document.createElement('div');logo.style.cssText="font-family:'Lora',serif;font-size:36px;font-weight:500;color:#1a1a1a;letter-spacing:-0.02em;";logo.textContent='Æther';
+  const logoSub=document.createElement('div');logoSub.style.cssText="font-family:'DM Sans',sans-serif;font-size:10px;color:#b0a898;text-transform:uppercase;letter-spacing:0.2em;margin-top:2px;";logoSub.textContent='RÉSEAU';
+  logoWrap.appendChild(logo);logoWrap.appendChild(logoSub);card.appendChild(logoWrap);
 
-  if(done){
-    card.appendChild(div({textAlign:'center',padding:'24px 0'},[
-      el('div',{style:{fontSize:'40px',marginBottom:'14px'}},'◎'),
-      p({...S.serif(17)},'Bienvenue sur Æther.'),
-      p({...S.sans(12,'#a09890'),marginTop:'8px'},'Connexion en cours…')
-    ]));
-  } else if(mode==='login'){
-    card.appendChild(el('div',{style:{...S.LBL,marginBottom:'24px'}},'Connexion'));
-    card.appendChild(Field('Email','email',f.email,v=>setF('email',v),err.email,'vous@email.com'));
-    card.appendChild(Field('Mot de passe','password',f.password,v=>setF('password',v),err.password,'••••••••'));
+  if(authMode==='login'){
+    // Login form
+    const title=document.createElement('h2');title.style.cssText='font-size:20px;font-weight:700;color:#1a1a1a;margin:0 0 20px;text-align:center;';title.textContent='Connexion';card.appendChild(title);
+    if(authErrors.global){const err=document.createElement('div');err.style.cssText='background:#fff0f0;border:1px solid #e0c0c0;border-radius:10px;padding:10px 14px;font-size:13px;color:#c0392b;margin-bottom:16px;';err.textContent=authErrors.global;card.appendChild(err);}
 
-    const loginBtn=btn({...S.BTN,opacity:loading?0.6:1},'Se connecter',async()=>{
+    const mkInp=(lbl,type,key,ph,id)=>{
+      const w=document.createElement('div');w.style.cssText='margin-bottom:16px;';
+      const l=document.createElement('label');l.style.cssText='display:block;font-size:12px;font-weight:600;color:#7a7068;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;';l.textContent=lbl;
+      const inp=document.createElement('input');inp.type=type;inp.id=id;inp.name=key;inp.placeholder=ph;
+      if(type==='email')inp.autocomplete='email';if(type==='password')inp.autocomplete='current-password';
+      inp.style.cssText='width:100%;box-sizing:border-box;border:1.5px solid '+(authErrors[key]?'#e0c0c0':'#e8e4de')+';border-radius:12px;padding:12px 16px;font-size:15px;color:#1a1a1a;outline:none;background:#faf7f3;transition:border-color 0.2s;';
+      inp.value=(STATE.authForm||{})[key]||'';
+      inp.addEventListener('focus',()=>inp.style.borderColor='#c17a4a');
+      inp.addEventListener('blur',()=>inp.style.borderColor=authErrors[key]?'#e0c0c0':'#e8e4de');
+      inp.addEventListener('input',e=>{setF(key,e.target.value);});
+      if(authErrors[key]){const e=document.createElement('div');e.style.cssText='font-size:12px;color:#c0392b;margin-top:4px;';e.textContent=authErrors[key];w.appendChild(l);w.appendChild(inp);w.appendChild(e);}
+      else{w.appendChild(l);w.appendChild(inp);}
+      card.appendChild(w);
+    };
+    mkInp('Email','email','email','vous@email.com','login-email');
+    mkInp('Mot de passe','password','password','••••••••','login-password');
+
+    const loginBtn=document.createElement('button');loginBtn.type='button';loginBtn.textContent=authLoading?'Connexion...':'Se connecter';
+    loginBtn.style.cssText='width:100%;background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;margin-top:4px;transition:opacity 0.2s;';
+    loginBtn.style.opacity=authLoading?'0.6':'1';
+    loginBtn.onclick=async()=>{
       if(STATE.authLoading)return;
-      const af=STATE.authForm;
-      const e={};
-      if(!af.email.trim()) e.email='Requis';
-      if(!af.password)     e.password='Requis';
+      const af=STATE.authForm||{};const e={};
+      if(!af.email?.trim())e.email='Requis';
+      if(!af.password)e.password='Requis';
       if(Object.keys(e).length){setState({authErrors:e});return;}
       setState({authLoading:true,authErrors:{}});
-      try{
-        await signInWithEmailAndPassword(auth,af.email.trim(),af.password);
-      }catch(ex){
-        let msg='Erreur de connexion';
-        if(ex.code==='auth/user-not-found'||ex.code==='auth/wrong-password'||ex.code==='auth/invalid-credential') msg='Email ou mot de passe incorrect';
-        if(ex.code==='auth/too-many-requests') msg='Trop de tentatives, réessayez plus tard';
-        setState({authLoading:false,authErrors:{global:msg}});
-      }
-    });
+      try{await signInWithEmailAndPassword(auth,af.email.trim(),af.password);}
+      catch(ex){setState({authLoading:false,authErrors:{global:ex.code==='auth/user-not-found'||ex.code==='auth/wrong-password'?'Email ou mot de passe incorrect':'Erreur : '+(ex.code||ex.message)}});}
+    };
     card.appendChild(loginBtn);
-    if(err.global) card.appendChild(div({fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#c17a4a',marginTop:'8px',textAlign:'center'},[err.global]));
-    card.appendChild(div({textAlign:'center',marginTop:'20px'},[
-      span(S.sans(12,'#a09890'),'Pas encore de compte ? '),
-      btn({...S.LINK},'Créer un compte',()=>setState({authMode:'register',authStep:1,authErrors:{},authForm:{name:'',email:'',password:'',confirm:'',bio:''}}))
-    ]));
-  } else {
-    // Register
-    const header=div({display:'flex',alignItems:'center',gap:'10px',marginBottom:'24px'},[
-      el('div',{style:S.LBL},'Créer un compte')
-    ]);
-    const prog=div({marginLeft:'auto',display:'flex',gap:'4px'});
-    [1,2].forEach(s=>prog.appendChild(div({width:'22px',height:'3px',borderRadius:'2px',background:step>=s?'#2a2420':'#e0dbd4'})));
-    header.appendChild(prog);
-    card.appendChild(header);
 
-    if(step===1){
-      card.appendChild(Field('Nom complet','text',f.name,v=>setF('name',v),err.name,'Prénom Nom'));
-      card.appendChild(Field('Email','email',f.email,v=>setF('email',v),err.email,'vous@email.com'));
-      card.appendChild(Field('Mot de passe','password',f.password,v=>setF('password',v),err.password,'••••••••'));
-      card.appendChild(Field('Confirmer','password',f.confirm,v=>setF('confirm',v),err.confirm,'••••••••'));
-      card.appendChild(btn({...S.BTN},'Continuer →',()=>{
-        const af=STATE.authForm;
-        const e={};
-        if(!af.name.trim())      e.name='Requis';
-        if(!af.email.trim())     e.email='Requis';
-        else if(!/\S+@\S+\.\S+/.test(af.email)) e.email='Email invalide';
-        if(!af.password)         e.password='Requis';
-        else if(af.password.length<6) e.password='6 caractères minimum';
-        if(af.password!==af.confirm)   e.confirm='Ne correspond pas';
+    const switchRow=document.createElement('div');switchRow.style.cssText='text-align:center;margin-top:20px;font-size:14px;color:#7a7068;';
+    switchRow.innerHTML='Pas encore membre ? ';
+    const sw=document.createElement('span');sw.style.cssText='color:#c17a4a;cursor:pointer;font-weight:600;';sw.textContent="S'inscrire";
+    sw.onclick=()=>setState({authMode:'register',authStep:1,authErrors:{},authForm:{}});
+    switchRow.appendChild(sw);card.appendChild(switchRow);
+
+  } else {
+    // Register form - 2 steps
+    const stepIndicator=document.createElement('div');stepIndicator.style.cssText='display:flex;gap:6px;justify-content:center;margin-bottom:20px;';
+    [1,2].forEach(s=>{const d=document.createElement('div');d.style.cssText='width:32px;height:3px;border-radius:2px;background:'+(authStep>=s?'#1a1a1a':'#e8e4de')+';transition:background 0.3s;';stepIndicator.appendChild(d);});
+    card.appendChild(stepIndicator);
+
+    const title=document.createElement('h2');title.style.cssText='font-size:20px;font-weight:700;color:#1a1a1a;margin:0 0 20px;text-align:center;';title.textContent=authStep===1?'Créer un compte':'Votre profil';card.appendChild(title);
+    if(authErrors.global){const err=document.createElement('div');err.style.cssText='background:#fff0f0;border:1px solid #e0c0c0;border-radius:10px;padding:10px 14px;font-size:13px;color:#c0392b;margin-bottom:16px;';err.textContent=authErrors.global;card.appendChild(err);}
+
+    const mkInp2=(lbl,type,key,ph,id,ac)=>{
+      const w=document.createElement('div');w.style.cssText='margin-bottom:16px;';
+      const l=document.createElement('label');l.style.cssText='display:block;font-size:12px;font-weight:600;color:#7a7068;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;';l.textContent=lbl;
+      const inp=document.createElement('input');inp.type=type;if(id)inp.id=id;if(id)inp.name=key;if(ac)inp.autocomplete=ac;inp.placeholder=ph;
+      inp.style.cssText='width:100%;box-sizing:border-box;border:1.5px solid '+(authErrors[key]?'#e0c0c0':'#e8e4de')+';border-radius:12px;padding:12px 16px;font-size:15px;color:#1a1a1a;outline:none;background:#faf7f3;';
+      inp.value=(STATE.authForm||{})[key]||'';
+      inp.addEventListener('focus',()=>inp.style.borderColor='#c17a4a');
+      inp.addEventListener('blur',()=>inp.style.borderColor=authErrors[key]?'#e0c0c0':'#e8e4de');
+      inp.addEventListener('input',e=>{setF(key,e.target.value);});
+      if(authErrors[key]){const e=document.createElement('div');e.style.cssText='font-size:12px;color:#c0392b;margin-top:4px;';e.textContent=authErrors[key];w.appendChild(l);w.appendChild(inp);w.appendChild(e);}
+      else{w.appendChild(l);w.appendChild(inp);}
+      return w;
+    };
+
+    if(authStep===1){
+      card.appendChild(mkInp2('Nom complet','text','name','Prénom Nom','reg-name','name'));
+      card.appendChild(mkInp2('Email','email','email','vous@email.com','reg-email','email'));
+      card.appendChild(mkInp2('Mot de passe','password','password','6 caractères minimum','reg-password','new-password'));
+      card.appendChild(mkInp2('Confirmer','password','confirm','Répétez le mot de passe','reg-confirm','new-password'));
+      const nextBtn=document.createElement('button');nextBtn.type='button';nextBtn.textContent='Continuer →';
+      nextBtn.style.cssText='width:100%;background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;margin-top:4px;';
+      nextBtn.onclick=()=>{
+        const af=STATE.authForm||{};const e={};
+        if(!af.name?.trim())e.name='Requis';
+        if(!af.email?.trim())e.email='Requis';
+        else if(!/\S+@\S+\.\S+/.test(af.email))e.email='Email invalide';
+        if(!af.password)e.password='Requis';
+        else if(af.password.length<6)e.password='6 caractères minimum';
+        if(af.password!==af.confirm)e.confirm='Ne correspond pas';
         if(Object.keys(e).length){setState({authErrors:e});return;}
         setState({authErrors:{},authStep:2});
-      }));
+      };
+      card.appendChild(nextBtn);
     } else {
-      // Step 2: handle + bio
-      card.appendChild(Field('Identifiant (@)','text',f.handle||'',v=>setF('handle',v),err.handle,'votre_pseudo'));
-      const bioW=div({marginBottom:'20px'},[el('label',{style:S.LBL},'Bio (optionnel)')]);
-      const bioTA=el('textarea',{placeholder:'En quelques mots…',rows:3,style:{width:'100%',border:'none',borderBottom:'1.5px solid #d5cfc8',outline:'none',padding:'8px 0',fontFamily:"'Lora',serif",fontSize:'14px',color:'#2a2420',background:'transparent',resize:'none',lineHeight:1.6,display:'block'}});
-      bioTA.value=f.bio||'';
-      bioTA.addEventListener('input',e=>{ STATE.authForm={...STATE.authForm,bio:e.target.value}; });
-      bioW.appendChild(bioTA);
-      card.appendChild(bioW);
+      card.appendChild(mkInp2('Identifiant (@)','text','handle','votre_pseudo','reg-handle','username'));
+      const bioW=document.createElement('div');bioW.style.cssText='margin-bottom:16px;';
+      const bioL=document.createElement('label');bioL.style.cssText='display:block;font-size:12px;font-weight:600;color:#7a7068;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;';bioL.textContent='Bio (optionnel)';
+      const bioTA=document.createElement('textarea');bioTA.style.cssText='width:100%;box-sizing:border-box;border:1.5px solid #e8e4de;border-radius:12px;padding:12px 16px;font-size:14px;color:#1a1a1a;outline:none;background:#faf7f3;resize:none;font-family:inherit;';bioTA.rows=3;bioTA.placeholder='Parlez de vous...';
+      bioTA.value=(STATE.authForm||{}).bio||'';bioTA.addEventListener('input',e=>{setF('bio',e.target.value);});
+      bioW.appendChild(bioL);bioW.appendChild(bioTA);card.appendChild(bioW);
 
-      const regBtn=btn({...S.BTN,opacity:loading?0.6:1},'Rejoindre Æther',async()=>{
+      const joinBtn=document.createElement('button');joinBtn.type='button';joinBtn.textContent=authLoading?'Création...':'Rejoindre Æther';
+      joinBtn.style.cssText='width:100%;background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:12px;';
+      joinBtn.style.opacity=authLoading?'0.6':'1';
+      joinBtn.onclick=async()=>{
         if(STATE.authLoading)return;
-        const af=STATE.authForm;
-        const e={};
+        const af=STATE.authForm||{};const e={};
         const handle=(af.handle||'').trim().toLowerCase();
-        if(!handle)           e.handle='Requis';
-        else if(!/^[a-z0-9_]{3,20}$/.test(handle)) e.handle='3-20 car. : lettres minuscules, chiffres, _';
+        if(!handle)e.handle='Requis';
+        else if(!/^[a-z0-9_]{3,20}$/.test(handle))e.handle='3-20 car. : lettres minuscules, chiffres, _';
         if(Object.keys(e).length){setState({authErrors:e});return;}
-        // Create account
         setState({authLoading:true,authErrors:{}});
         try{
-          // Step 1: create Firebase Auth account first
           const cred=await createUserWithEmailAndPassword(auth,af.email.trim(),af.password);
           await updateProfile(cred.user,{displayName:af.name.trim()});
-          // Step 2: wait for auth token to be fully ready
           await cred.user.getIdToken(true);
-          // Step 3: save profile in Firestore (now authenticated)
-          const profileData = {
-            displayName: af.name.trim(),
-            handle:      handle,
-            bio:         af.bio.trim()||'Nouveau sur Æther',
-            email:       af.email.trim(),
-            followers:   0,
-            following:   0,
-            followingIds:[],
-            avatarColor: AV_COLORS[Math.floor(Math.random()*AV_COLORS.length)],
-            joinDate:    new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'}),
-            createdAt:   serverTimestamp(),
-          };
-          // Retry up to 3 times in case token propagation is slow
+          const profileData={displayName:af.name.trim(),handle,bio:(af.bio||'').trim()||'Nouveau sur Æther',email:af.email.trim(),followers:0,following:0,followingIds:[],avatarColor:AV_COLORS[Math.floor(Math.random()*AV_COLORS.length)],joinDate:new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'}),createdAt:serverTimestamp()};
           let saved=false;
-          for(let i=0;i<3;i++){
-            try{
-              await setDoc(doc(db,'users',cred.user.uid), profileData);
-              saved=true; break;
-            }catch(e2){
-              if(i<2) await new Promise(r=>setTimeout(r,1000));
-              else throw e2;
-            }
-          }
+          for(let i=0;i<3;i++){try{await setDoc(doc(db,'users',cred.user.uid),profileData);saved=true;break;}catch(e2){if(i<2)await new Promise(r=>setTimeout(r,1000));else throw e2;}}
           setState({authDone:true,authLoading:false});
-        }catch(ex){
-          let msg='Erreur lors de la création';
-          if(ex.code==='auth/email-already-in-use') msg='Cet email est déjà utilisé';
-          else if(ex.code==='auth/network-request-failed') msg='Pas de connexion réseau';
-          else if(ex.code==='auth/unauthorized-domain') msg='Domaine non autorisé dans Firebase Authentication → Settings → Domaines autorisés';
-          else if(ex.code==='auth/operation-not-allowed') msg='Email/Password non activé dans Firebase Authentication';
-          else if(ex.code==='auth/invalid-api-key') msg='Clé API Firebase invalide';
-          else msg='Erreur: ' + (ex.code || ex.message || JSON.stringify(ex));
-          console.error('Firebase error:', ex);
-          setState({authLoading:false,authErrors:{global:msg}});
-        }
-      });
-      card.appendChild(regBtn);
-      if(err.global) card.appendChild(div({fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#c17a4a',marginTop:'8px',textAlign:'center'},[err.global]));
-      card.appendChild(btn({...S.LINK,display:'block',margin:'12px auto 0'},'← Retour',()=>setState({authStep:1,authErrors:{}})));
+        }catch(ex){let msg='Erreur lors de la création';if(ex.code==='auth/email-already-in-use')msg='Cet email est déjà utilisé';else if(ex.code==='auth/network-request-failed')msg='Pas de connexion réseau';else msg='Erreur : '+(ex.code||ex.message||String(ex));console.error('Firebase error:',ex);setState({authLoading:false,authErrors:{global:msg}});}
+      };
+      card.appendChild(joinBtn);
+      const backLink=document.createElement('button');backLink.type='button';backLink.textContent='← Retour';
+      backLink.style.cssText='width:100%;background:none;border:none;cursor:pointer;font-size:13px;color:#7a7068;padding:8px;';
+      backLink.onclick=()=>setState({authErrors:{},authStep:1});card.appendChild(backLink);
     }
-    card.appendChild(div({textAlign:'center',marginTop:'20px'},[
-      span(S.sans(12,'#a09890'),'Déjà membre ? '),
-      btn({...S.LINK},'Se connecter',()=>setState({authMode:'login',authStep:1,authErrors:{},authForm:{name:'',email:'',password:'',confirm:'',bio:''}}))
-    ]));
+
+    const switchRow2=document.createElement('div');switchRow2.style.cssText='text-align:center;margin-top:16px;font-size:14px;color:#7a7068;';
+    switchRow2.innerHTML='Déjà membre ? ';
+    const sw2=document.createElement('span');sw2.style.cssText='color:#c17a4a;cursor:pointer;font-weight:600;';sw2.textContent='Se connecter';
+    sw2.onclick=()=>setState({authMode:'login',authErrors:{},authForm:{}});
+    switchRow2.appendChild(sw2);card.appendChild(switchRow2);
   }
 
-  if(loading) card.appendChild(div({textAlign:'center',marginTop:'16px'},[Spinner()]));
-  wrap.appendChild(card);
-  return wrap;
+  root.appendChild(card);return root;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// FEED
-// ══════════════════════════════════════════════════════════════════
 function renderFeed(){
-  const me=STATE.userProfile;
-  const root=div({});
+  const me = STATE.userProfile||{};
+  const root = document.createElement('div');
+  root.style.cssText = 'padding:0;';
 
-  // Compose box
-  const compose=div({padding:'16px',borderBottom:'1px solid #ede8e0'});
-  const row=div({display:'flex',gap:'12px'});
-  row.appendChild(Avatar(me,36));
-  const col=div({flex:1,minWidth:0});
-  const ta=el('textarea',{placeholder:'Partagez une pensée…',rows:3,style:{width:'100%',border:'none',outline:'none',resize:'none',fontFamily:"'Lora',serif",fontSize:'15px',color:'#2a2420',background:'transparent',lineHeight:1.7,minHeight:'60px',display:'block'}});
-  ta.value=STATE.composeText||'';
-  ta.addEventListener('input',e=>{ STATE.composeText=e.target.value; const pb=ta.closest('div')?.querySelector('button[data-pub]'); if(pb) pb.style.opacity=(STATE.composeText.trim()||STATE.composeMedia)?1:0.4; });
-  col.appendChild(ta);
+  // ── Compose box ──
+  const compose = document.createElement('div');
+  compose.style.cssText = 'background:#fff;border-radius:16px;padding:20px;margin-bottom:12px;';
 
+  const composeTop = document.createElement('div');
+  composeTop.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:16px;';
+  composeTop.appendChild(Avatar(me,42));
+
+  const composePlaceholder = document.createElement('div');
+  composePlaceholder.style.cssText = 'flex:1;background:#f5f2ee;border-radius:24px;padding:12px 18px;cursor:text;color:#b0a898;font-size:14px;';
+  composePlaceholder.textContent = 'Quoi de neuf, '+(me.displayName?.split(' ')[0]||'toi')+' ?';
+
+  const composeTA = document.createElement('textarea');
+  composeTA.style.cssText = 'flex:1;background:#f5f2ee;border:none;border-radius:16px;padding:12px 18px;font-size:14px;color:#2a2420;resize:none;outline:none;display:none;width:100%;box-sizing:border-box;font-family:inherit;';
+  composeTA.rows=3; composeTA.placeholder='Quoi de neuf ?';
+  composeTA.addEventListener('input',e=>{ STATE.composeText=e.target.value; });
+
+  composePlaceholder.onclick = ()=>{
+    composePlaceholder.style.display='none';
+    composeTA.style.display='block';
+    composeTA.focus();
+  };
+  composeTop.appendChild(composePlaceholder);
+  composeTop.appendChild(composeTA);
+  compose.appendChild(composeTop);
+
+  // Media preview
   if(STATE.composeMedia){
-    const prev=div({position:'relative',marginTop:'10px',borderRadius:'8px',overflow:'hidden',background:'#f0ebe4'});
-    const m=STATE.composeMedia;
-    prev.appendChild(m.type==='image'
-      ?el('img',{src:m.url,style:{width:'100%',maxHeight:'240px',objectFit:'cover',display:'block'}})
-      :el('video',{src:m.url,controls:true,style:{width:'100%',maxHeight:'240px',display:'block'}}));
-    prev.appendChild(btn({position:'absolute',top:'8px',right:'8px',background:'rgba(42,36,32,0.7)',border:'none',color:'#fff',width:'26px',height:'26px',borderRadius:'50%',cursor:'pointer',fontSize:'13px'},'✕',()=>setState({composeMedia:null})));
-    col.appendChild(prev);
+    const prev=document.createElement('div');
+    prev.style.cssText='position:relative;border-radius:12px;overflow:hidden;background:#f0ebe4;margin-bottom:14px;';
+    if(STATE.composeMedia.type==='image'){
+      const img=document.createElement('img');img.src=STATE.composeMedia.url;img.style.cssText='width:100%;max-height:400px;object-fit:contain;display:block;';
+      prev.appendChild(img);
+    } else {
+      const vid=document.createElement('video');vid.src=STATE.composeMedia.url;vid.controls=true;vid.style.cssText='width:100%;max-height:400px;display:block;';
+      prev.appendChild(vid);
+    }
+    const rm=document.createElement('button');rm.type='button';rm.textContent='✕';
+    rm.style.cssText='position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.5);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;';
+    rm.onclick=()=>setState({composeMedia:null});
+    prev.appendChild(rm);compose.appendChild(prev);
   }
 
-  const fileInp=el('input',{type:'file',style:{display:'none'}});
-  fileInp.addEventListener('change',async e=>{
-    const file=e.target.files[0]; if(!file)return;
-    const url=URL.createObjectURL(file);
-    setState({composeMedia:{file,url,type:file.type.startsWith('video/')?'video':'image'}});
+  const fileInp=document.createElement('input');fileInp.type='file';fileInp.style.display='none';
+  fileInp.addEventListener('change',e=>{
+    const file=e.target.files[0];if(!file)return;
+    setState({composeMedia:{file,url:URL.createObjectURL(file),type:file.type.startsWith('video/')?'video':'image'}});
     e.target.value='';
   });
 
-  const actions=div({display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:'10px'});
-  const mediaBtns=div({display:'flex',gap:'6px'});
-  const mkMBtn=(icon,accept)=>btn({background:'none',border:'1px solid #e0dbd4',padding:'5px 10px',borderRadius:'16px',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a09890'},icon,()=>{fileInp.accept=accept;fileInp.click();});
-  mediaBtns.appendChild(mkMBtn('🖼 Photo','image/*'));
-  mediaBtns.appendChild(mkMBtn('▶ Vidéo','video/*'));
-  mediaBtns.appendChild(fileInp);
-  actions.appendChild(mediaBtns);
+  // Bottom bar
+  const composeBottom=document.createElement('div');
+  composeBottom.style.cssText='display:flex;align-items:center;gap:4px;padding-top:14px;border-top:1px solid #f5f2ee;';
+
+  const mkBtn=(icon,lbl,accept)=>{
+    const b=document.createElement('button');b.type='button';
+    b.style.cssText='display:flex;align-items:center;gap:5px;padding:7px 12px;border:none;background:none;cursor:pointer;border-radius:8px;color:#7a7068;font-size:13px;';
+    b.onmouseenter=()=>b.style.background='#f5f0ea';b.onmouseleave=()=>b.style.background='none';
+    const ic=document.createElement('span');ic.textContent=icon;ic.style.cssText='font-size:15px;pointer-events:none;';
+    const tx=document.createElement('span');tx.textContent=lbl;tx.style.pointerEvents='none';
+    b.appendChild(ic);b.appendChild(tx);
+    b.onclick=()=>{fileInp.accept=accept;fileInp.click();};return b;
+  };
+  composeBottom.appendChild(mkBtn('🖼','Image','image/*'));
+  composeBottom.appendChild(mkBtn('▶','Vidéo','video/*'));
+  composeBottom.appendChild(fileInp);
+  composeBottom.appendChild(Object.assign(document.createElement('div'),{style:'flex:1'}));
 
   let publishing=false;
-  const pubBtn=btn({...S.BTN,width:'auto',padding:'7px 18px',marginTop:'0',opacity:0.4},'Publier',async()=>{
-    if(publishing) return;
-    const txt=STATE.composeText.trim();
+  const pubBtn=document.createElement('button');pubBtn.type='button';pubBtn.textContent='Publier';
+  pubBtn.style.cssText='background:#1a1a1a;color:#fff;border:none;padding:9px 22px;border-radius:22px;font-size:13px;font-weight:600;cursor:pointer;';
+  pubBtn.onclick=async()=>{
+    if(publishing)return;
+    const txt=(STATE.composeText||composeTA.value||'').trim();
     const med=STATE.composeMedia;
-    if(!txt&&!med) return;
-    publishing=true;
-    pubBtn.style.opacity='0.6';
-    pubBtn.textContent='…';
+    if(!txt&&!med)return;
+    publishing=true;pubBtn.style.opacity='0.6';pubBtn.textContent='…';
     try{
       let mediaData=null;
       if(med?.file){
-        pubBtn.textContent='…';
-        try {
-          if(med.type==='video'){
-            // Videos → Cloudinary
-            mediaData = await uploadToCloudinary(med.file);
-          } else {
-            // Images → base64 compressed
-            const b64 = await new Promise((res,rej)=>{
-              const img=new Image();
-              img.onload=()=>{
-                const canvas=document.createElement('canvas');
-                const MAX=800;
-                let w=img.width,h=img.height;
-                if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
-                if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}
-                canvas.width=w;canvas.height=h;
-                canvas.getContext('2d').drawImage(img,0,0,w,h);
-                res(canvas.toDataURL('image/jpeg',0.75));
-              };
-              img.onerror=rej;
-              img.src=URL.createObjectURL(med.file);
-            });
-            mediaData={url:b64,type:'image'};
-          }
-        } catch(e) {
-          toast('Erreur upload', true);
-          publishing=false;
-          render();
-          return;
+        pubBtn.textContent='Upload…';
+        if(med.type==='video'){mediaData=await uploadToCloudinary(med.file);}
+        else{
+          const b64=await new Promise((res,rej)=>{
+            const img=new Image();
+            img.onload=()=>{const c=document.createElement('canvas');let w=img.width,h=img.height;const MAX=900;if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);res(c.toDataURL('image/jpeg',0.8));};
+            img.onerror=rej;img.src=URL.createObjectURL(med.file);
+          });
+          mediaData={url:b64,type:'image'};
         }
       }
-      await addDoc(collection(db,'posts'),{
-        userId:      STATE.currentUser.uid,
-        content:     txt,
-        media:       mediaData,
-        likes:       0,
-        likedBy:     [],
-        comments:    [],
-        createdAt:   serverTimestamp(),
-      });
-      STATE.composeText='';
-      STATE.composeMedia=null;
+      await addDoc(collection(db,'posts'),{userId:STATE.currentUser.uid,content:txt||'',media:mediaData,likes:0,likedBy:[],comments:[],createdAt:serverTimestamp()});
+      STATE.composeText='';STATE.composeMedia=null;
+      composeTA.value='';composeTA.style.display='none';composePlaceholder.style.display='block';
       toast('Publication envoyée !');
-    }catch(ex){
-      toast('Erreur lors de la publication','err');
-      console.error(ex);
-    }
-    publishing=false;
-    render();
-  });
-  // enable/disable
-  pubBtn.dataset.pub='1';
-  const checkPub=()=>{pubBtn.style.opacity=(STATE.composeText.trim()||STATE.composeMedia)?1:0.4;};
-  checkPub();
-  actions.appendChild(pubBtn);
-  col.appendChild(actions);
-  row.appendChild(col);
-  compose.appendChild(row);
+    }catch(e){toast('Erreur',true);console.error(e);}
+    publishing=false;pubBtn.style.opacity='1';pubBtn.textContent='Publier';
+  };
+  composeBottom.appendChild(pubBtn);
+  compose.appendChild(composeBottom);
   root.appendChild(compose);
 
   if(STATE.postsLoading){root.appendChild(Spinner());return root;}
 
-  // Posts list
-  STATE.posts.forEach((post,i)=>{
+  // ── Posts ──
+  STATE.posts.forEach(post=>{
     const u=getUserCached(post.userId)||{};
     const liked=(post.likedBy||[]).includes(STATE.currentUser.uid);
     const showC=STATE.openComments[post.id];
 
-    const pd=div({padding:'16px',borderBottom:'1px solid #ede8e0'});
-    const pr=div({display:'flex',gap:'12px'});
-    pr.appendChild(Avatar(u,36));
-    const pc=div({flex:1,minWidth:0});
-    const ph=div({display:'flex',gap:'8px',alignItems:'baseline',marginBottom:'5px',flexWrap:'wrap'});
-    ph.appendChild(el('span',{style:{...S.sans(14,'#2a2420',600)}},u.displayName||'Utilisateur'));
-    ph.appendChild(el('span',{style:S.sans(12,'#a09890')},u.handle?`@${u.handle}`:''));
-    // Time
-    let timeStr='';
-    if(post.createdAt?.toDate){
-      const d=post.createdAt.toDate();
-      const diff=Date.now()-d.getTime();
-      if(diff<3600000)      timeStr=Math.floor(diff/60000)+'min';
-      else if(diff<86400000)timeStr=Math.floor(diff/3600000)+'h';
-      else                  timeStr=Math.floor(diff/86400000)+'j';
-    }
-    ph.appendChild(el('span',{style:{...S.sans(11,'#c5bfb8'),marginLeft:'auto'}},timeStr));
-    pc.appendChild(ph);
+    const card=document.createElement('div');
+    card.style.cssText='background:#fff;border-radius:16px;padding:20px;margin-bottom:12px;';
 
-    if(post.content) pc.appendChild(p({...S.serif(15,'#3a3430'),margin:'0 0 10px'},post.content));
+    // Header
+    const ph=document.createElement('div');ph.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:14px;';
+    const avEl=Avatar(u,42);avEl.style.cursor='pointer';avEl.onclick=()=>setState({profileUid:post.userId,tab:'profile'});
+    ph.appendChild(avEl);
+    const pInfo=document.createElement('div');pInfo.style.flex='1';pInfo.style.minWidth='0';
+    const pNameRow=document.createElement('div');pNameRow.style.cssText='display:flex;align-items:center;gap:6px;flex-wrap:wrap;';
+    const pn=document.createElement('span');pn.style.cssText='font-size:14px;font-weight:700;color:#1a1a1a;cursor:pointer;';pn.textContent=u.displayName||'';
+    pn.onclick=()=>setState({profileUid:post.userId,tab:'profile'});
+    pNameRow.appendChild(pn);
+    const pgb=GradeBadge(u,true);if(pgb)pNameRow.appendChild(pgb);
+    const pSub=document.createElement('div');pSub.style.cssText='font-size:12px;color:#a09890;margin-top:2px;';
+    let timeStr='';if(post.createdAt?.toDate){const d=post.createdAt.toDate(),diff=Date.now()-d.getTime();if(diff<3600000)timeStr='il y a '+Math.floor(diff/60000)+'min';else if(diff<86400000)timeStr='il y a '+Math.floor(diff/3600000)+'h';else timeStr='il y a '+Math.floor(diff/86400000)+'j';}
+    pSub.textContent='@'+(u.handle||'')+(timeStr?' · '+timeStr:'');
+    pInfo.appendChild(pNameRow);pInfo.appendChild(pSub);ph.appendChild(pInfo);
+    if(post.userId===STATE.currentUser.uid){
+      const mb=document.createElement('button');mb.type='button';mb.textContent='···';
+      mb.style.cssText='background:none;border:none;cursor:pointer;font-size:18px;color:#a09890;padding:4px 8px;border-radius:8px;letter-spacing:1px;';
+      mb.onclick=async()=>{if(confirm('Supprimer ce post ?'))try{await deleteDoc(doc(db,'posts',post.id));}catch(e){console.error(e);}};
+      ph.appendChild(mb);
+    }
+    card.appendChild(ph);
+
+    // Content
+    if(post.content){
+      const pc=document.createElement('p');
+      pc.style.cssText="font-family:'Lora',serif;font-size:15px;color:#2a2420;line-height:1.7;margin:0 0 14px;white-space:pre-wrap;";
+      pc.textContent=post.content;card.appendChild(pc);
+    }
+
+    // Media
     if(post.media?.url){
-      const mw=div({marginBottom:'10px',borderRadius:'8px',overflow:'hidden',background:'#f0ebe4'});
+      const mw=document.createElement('div');mw.style.cssText='border-radius:12px;overflow:hidden;margin-bottom:14px;background:#f0ebe4;';
       if(post.media.type==='image'){
-        mw.appendChild(el('img',{src:post.media.url,loading:'lazy',style:{width:'100%',maxHeight:'600px',objectFit:'contain',display:'block'}}));
-      } else {
-        mw.appendChild(el('video',{src:post.media.url,controls:true,playsInline:true,style:{width:'100%',maxHeight:'500px',display:'block',background:'#000'}}));
+        const img=document.createElement('img');img.src=post.media.url;img.loading='lazy';
+        img.style.cssText='width:100%;max-height:560px;object-fit:contain;display:block;';mw.appendChild(img);
+      }else{
+        const vid=document.createElement('video');vid.src=post.media.url;vid.controls=true;vid.playsInline=true;
+        vid.style.cssText='width:100%;max-height:500px;display:block;background:#000;';mw.appendChild(vid);
       }
-      pc.appendChild(mw);
+      card.appendChild(mw);
     }
 
-    const btns=div({display:'flex',gap:'18px'});
-    // Like
-    const likeBtn=btn({background:'none',border:'none',cursor:'pointer',padding:'0',display:'flex',alignItems:'center',gap:'5px',fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:liked?'#c17a4a':'#a09890'},[
-      el('span',{style:{fontSize:'15px'}},liked?'♥':'♡'),
-      document.createTextNode((post.likes||0)+'')
-    ],async()=>{
+    // Actions
+    const actions=document.createElement('div');
+    actions.style.cssText='display:flex;align-items:center;gap:2px;padding-top:12px;border-top:1px solid #f5f2ee;';
+    const mkAct=(icon,count,isActive,onClick)=>{
+      const b=document.createElement('button');b.type='button';
+      b.style.cssText='display:flex;align-items:center;gap:5px;padding:7px 10px;background:none;border:none;cursor:pointer;border-radius:10px;font-size:13px;color:'+(isActive?'#e05c5c':'#7a7068')+';transition:all 0.15s;';
+      b.onmouseenter=()=>b.style.background='#f5f0ea';b.onmouseleave=()=>b.style.background='none';
+      const ic=document.createElement('span');ic.textContent=icon;ic.style.pointerEvents='none';
+      const ct=document.createElement('span');ct.textContent=String(count||0);ct.style.pointerEvents='none';
+      b.appendChild(ic);b.appendChild(ct);b.onclick=onClick;return b;
+    };
+    actions.appendChild(mkAct(liked?'♥':'♡',post.likes||0,liked,async()=>{
       const ref=doc(db,'posts',post.id);
-      try{
-        if(liked){
-          await updateDoc(ref,{likes:increment(-1),likedBy:arrayRemove(STATE.currentUser.uid)});
-        }else{
-          await updateDoc(ref,{likes:increment(1),likedBy:arrayUnion(STATE.currentUser.uid)});
-        }
-      }catch(e){console.error(e);}
-    });
-    btns.appendChild(likeBtn);
+      try{if(liked)await updateDoc(ref,{likes:increment(-1),likedBy:arrayRemove(STATE.currentUser.uid)});else await updateDoc(ref,{likes:increment(1),likedBy:arrayUnion(STATE.currentUser.uid)});}catch(e){console.error(e);}
+    }));
+    actions.appendChild(mkAct('💬',(post.comments||[]).length,false,()=>setState({openComments:{...STATE.openComments,[post.id]:!showC}})));
+    actions.appendChild(mkAct('↗',Math.max(1,Math.floor((post.likes||0)*0.13)),false,()=>{}));
+    const sp=document.createElement('div');sp.style.flex='1';actions.appendChild(sp);
+    const bm=document.createElement('button');bm.type='button';bm.textContent='🔖';
+    bm.style.cssText='background:none;border:none;cursor:pointer;font-size:16px;color:#a09890;padding:7px;border-radius:10px;';
+    bm.onmouseenter=()=>bm.style.background='#f5f0ea';bm.onmouseleave=()=>bm.style.background='none';
+    actions.appendChild(bm);card.appendChild(actions);
 
     // Comments
-    const commentCount=(post.comments||[]).length;
-    const cBtn=btn({background:'none',border:'none',cursor:'pointer',padding:'0',display:'flex',alignItems:'center',gap:'5px',fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a09890'},[
-      el('span',{style:{fontSize:'13px'}},'◯'),
-      document.createTextNode(commentCount+'')
-    ],()=>setState({openComments:{...STATE.openComments,[post.id]:!showC}}));
-    btns.appendChild(cBtn);
-
-    // Delete own post
-    if(post.userId===STATE.currentUser.uid){
-      const delBtn=btn({background:'none',border:'none',cursor:'pointer',padding:'0',display:'flex',alignItems:'center',marginLeft:'auto',color:'#c5bfb8',fontSize:'13px'},'✕',async()=>{
-        if(!confirm('Supprimer ce post ?'))return;
-        try{await deleteDoc(doc(db,'posts',post.id));}catch(e){console.error(e);}
-      });
-      btns.appendChild(delBtn);
-    }
-    pc.appendChild(btns);
-
-    // Comments section
     if(showC){
-      const cw=div({marginTop:'10px',paddingTop:'10px',borderTop:'1px solid #ede8e0'});
+      const cSec=document.createElement('div');cSec.style.cssText='margin-top:14px;padding-top:14px;border-top:1px solid #f5f2ee;';
       (post.comments||[]).forEach(c=>{
         const cu=getUserCached(c.userId)||{};
-        const cd=div({marginBottom:'6px',display:'flex',gap:'8px'});
-        const cNameWrap=div({display:'flex',alignItems:'center',gap:'4px'});
-        cNameWrap.appendChild(el('span',{style:{...S.sans(12,'#2a2420',600)}},cu.handle?'@'+cu.handle:cu.displayName||'?'));
-        const cgb=GradeBadge(cu,true); if(cgb) cNameWrap.appendChild(cgb);
-        cd.appendChild(cNameWrap);
-        cd.appendChild(el('span',{style:S.serif(13,'#5a504a')},c.text));
-        cw.appendChild(cd);
+        const cd=document.createElement('div');cd.style.cssText='display:flex;gap:10px;margin-bottom:10px;';
+        cd.appendChild(Avatar(cu,30));
+        const cb=document.createElement('div');cb.style.cssText='background:#f5f2ee;border-radius:12px;padding:8px 12px;flex:1;';
+        const cn=document.createElement('span');cn.style.cssText='font-size:12px;font-weight:700;color:#1a1a1a;';cn.textContent=(cu.handle?'@'+cu.handle:cu.displayName||'?')+' ';
+        const ct=document.createElement('span');ct.style.cssText="font-family:'Lora',serif;font-size:13px;color:#3a3430;";ct.textContent=c.text;
+        cb.appendChild(cn);cb.appendChild(ct);cd.appendChild(cb);cSec.appendChild(cd);
       });
-      const ci=div({display:'flex',gap:'8px',marginTop:'8px'});
-      const cinp=el('input',{type:'text',placeholder:'Répondre…',value:STATE.commentTexts[post.id]||'',style:{flex:1,border:'none',borderBottom:'1px solid #d5cfc8',outline:'none',padding:'4px 0',fontFamily:"'Lora',serif",fontSize:'13px',color:'#2a2420',background:'transparent'}});
-      cinp.addEventListener('input',e=>{ STATE.commentTexts[post.id]=e.target.value; });
-      const sendC=async()=>{
-        const t=STATE.commentTexts[post.id]?.trim(); if(!t)return;
-        const newComment={userId:STATE.currentUser.uid,text:t,createdAt:new Date().toISOString()};
-        try{
-          await updateDoc(doc(db,'posts',post.id),{comments:arrayUnion(newComment)});
-          STATE.commentTexts={...STATE.commentTexts,[post.id]:''};
-        }catch(e){console.error(e);}
-      };
+      const ci=document.createElement('div');ci.style.cssText='display:flex;gap:10px;align-items:center;';
+      ci.appendChild(Avatar(me,30));
+      const cinp=document.createElement('input');cinp.type='text';cinp.placeholder='Écrire un commentaire…';
+      cinp.value=STATE.commentTexts[post.id]||'';
+      cinp.style.cssText='flex:1;background:#f5f2ee;border:none;border-radius:20px;padding:10px 16px;font-size:13px;color:#2a2420;outline:none;';
+      cinp.addEventListener('input',e=>{STATE.commentTexts[post.id]=e.target.value;});
+      const sendC=async()=>{const t=(STATE.commentTexts[post.id]||cinp.value||'').trim();if(!t)return;try{await updateDoc(doc(db,'posts',post.id),{comments:arrayUnion({userId:STATE.currentUser.uid,text:t,createdAt:new Date().toISOString()})});STATE.commentTexts[post.id]='';cinp.value='';}catch(e){console.error(e);}};
       cinp.addEventListener('keydown',e=>{if(e.key==='Enter')sendC();});
-      ci.appendChild(cinp);
-      ci.appendChild(btn({background:'none',border:'none',cursor:'pointer',color:'#c17a4a',fontSize:'14px',padding:'0 4px'},'↵',sendC));
-      cw.appendChild(ci);
-      pc.appendChild(cw);
+      const sb=document.createElement('button');sb.type='button';sb.textContent='↵';
+      sb.style.cssText='background:#1a1a1a;color:#fff;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;';
+      sb.onclick=sendC;ci.appendChild(cinp);ci.appendChild(sb);cSec.appendChild(ci);
+      card.appendChild(cSec);
     }
-
-    pr.appendChild(pc);
-    pd.appendChild(pr);
-    root.appendChild(pd);
+    root.appendChild(card);
   });
-
   return root;
-}
-
-// ══════════════════════════════════════════════════════════════════
-// VIDEOS
-// ══════════════════════════════════════════════════════════════════
-function getVideoFeed(){
-  const q=(STATE.videoSearch||'').toLowerCase().trim();
-  return STATE.posts.filter(p=>{
-    if(p.media?.type!=='video') return false;
-    if(!q) return true;
-    const u=getUserCached(p.userId)||{};
-    return (p.content||'').toLowerCase().includes(q)||(u.handle||'').toLowerCase().includes(q)||(u.displayName||'').toLowerCase().includes(q);
-  });
 }
 
 function renderVideos(){
@@ -1183,672 +1147,423 @@ function renderVideos(){
 // ══════════════════════════════════════════════════════════════════
 // PROFILE
 // ══════════════════════════════════════════════════════════════════
-function renderProfile(userProf,isMe,onBack){
-  const me=STATE.userProfile||{};
-  const myPosts=STATE.posts.filter(p=>p.userId===userProf.uid);
-  const followed=(me.followingIds||[]).includes(userProf.uid);
-  const root=div({});
+function renderProfile(userProf, isMe, onBack){
+  const me = STATE.userProfile||{};
+  const root = document.createElement('div');
+  root.style.cssText = 'background:#f0ebe3;min-height:100vh;';
 
-  const hd=div({padding:'16px 16px 0',display:'flex',alignItems:'flex-start',justifyContent:'space-between'});
-  const left=div({display:'flex',gap:'12px',alignItems:'center'});
-  if(!isMe) left.appendChild(btn({background:'none',border:'none',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontSize:'16px',color:'#a09890',padding:'0',lineHeight:1},'←',onBack));
-  left.appendChild(Avatar(userProf,64));
-  hd.appendChild(left);
-  if(isMe){
-    hd.appendChild(btn({background:'none',border:'1px solid #d5cfc8',padding:'6px 12px',borderRadius:'16px',fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#5a504a',cursor:'pointer'},'✎ Modifier',()=>setState({editing:true})));
-  } else {
-    hd.appendChild(btn({background:followed?'#2a2420':'none',border:'1px solid '+(followed?'#2a2420':'#d5cfc8'),padding:'6px 16px',borderRadius:'16px',fontFamily:"'DM Sans',sans-serif",fontSize:'12px',fontWeight:600,color:followed?'#f5f0ea':'#5a504a',cursor:'pointer',transition:'all 0.2s'},followed?'Abonné ✓':'+ Suivre',async()=>{
-      const myRef=doc(db,'users',STATE.currentUser.uid);
-      const theirRef=doc(db,'users',userProf.uid);
-      try{
-        if(followed){
-          await updateDoc(myRef,  {following:increment(-1),followingIds:arrayRemove(userProf.uid)});
-          await updateDoc(theirRef,{followers:increment(-1)});
-        }else{
-          await updateDoc(myRef,  {following:increment(1),followingIds:arrayUnion(userProf.uid)});
-          await updateDoc(theirRef,{followers:increment(1)});
-        }
-        // Refresh their profile in cache (own profile updated via onSnapshot)
-        const tSnap=await getDoc(theirRef);
-        if(tSnap.exists()) STATE.users[userProf.uid]={uid:userProf.uid,...tSnap.data()};
-        render();
-      }catch(e){console.error(e);}
-    }));
+  // Back button (not own profile)
+  if(!isMe && onBack){
+    const backBtn = document.createElement('button');backBtn.type='button';
+    backBtn.style.cssText='display:flex;align-items:center;gap:8px;background:none;border:none;cursor:pointer;padding:16px 20px;font-size:14px;color:#7a7068;font-weight:500;';
+    backBtn.innerHTML='← <span style="pointer-events:none">Retour</span>';
+    backBtn.onclick=onBack;root.appendChild(backBtn);
   }
-  root.appendChild(hd);
 
-  const info=div({padding:'10px 16px 0'});
-  const profNameRow=div({display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'2px'});
-  profNameRow.appendChild(el('div',{style:{...S.sans(19,'#2a2420',700)}},userProf.displayName||''));
-  const profgb=GradeBadge(userProf); if(profgb) profNameRow.appendChild(profgb);
-  info.appendChild(profNameRow);
-  if(userProf.handle) info.appendChild(el('div',{style:{...S.sans(13,'#a09890'),marginBottom:'4px'}},'@'+userProf.handle));
-  if(userProf.bio) info.appendChild(p({...S.serif(13,'#5a504a'),lineHeight:1.6,marginBottom:'8px'},userProf.bio));
-  const meta=div({display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'12px'});
-  if(userProf.location) meta.appendChild(el('span',{style:S.sans(11,'#a09890')},`📍 ${userProf.location}`));
-  if(userProf.website){const a=el('a',{href:userProf.website,target:'_blank',style:{...S.sans(11,'#c17a4a'),textDecoration:'none'}},`🔗 ${userProf.website.replace(/^https?:\/\//,'')}`);meta.appendChild(a);}
-  if(userProf.joinDate) meta.appendChild(el('span',{style:S.sans(11,'#a09890')},`📅 ${userProf.joinDate}`));
-  info.appendChild(meta);
-  const stats=div({display:'flex',gap:'20px',paddingBottom:'14px',borderBottom:'1px solid #ede8e0'});
-  [['Publications',myPosts.length],['Abonnés',userProf.followers||0],['Abonnements',userProf.following||0]].forEach(([l,v])=>{
-    const s=div({});
-    s.appendChild(el('span',{style:{...S.sans(15,'#2a2420',700)}},v+' '));
-    s.appendChild(el('span',{style:S.sans(12,'#a09890')},l));
-    stats.appendChild(s);
+  // Banner
+  const banner=document.createElement('div');
+  banner.style.cssText='height:180px;background:linear-gradient(135deg,#e8dfd5 0%,#d5cfc8 100%);position:relative;overflow:hidden;';
+  if(userProf.bannerURL){const bi=document.createElement('img');bi.src=userProf.bannerURL;bi.style.cssText='width:100%;height:100%;object-fit:cover;';banner.appendChild(bi);}
+  root.appendChild(banner);
+
+  // Profile card
+  const card=document.createElement('div');
+  card.style.cssText='background:#fff;margin:0 0 12px;padding:0 20px 20px;position:relative;';
+
+  // Avatar (overlapping banner)
+  const avWrap=document.createElement('div');avWrap.style.cssText='position:relative;display:inline-block;margin-top:-48px;margin-bottom:12px;';
+  const av=Avatar(userProf,96);
+  av.style.cssText='width:96px;height:96px;border-radius:50%;border:4px solid #fff;flex-shrink:0;overflow:hidden;font-size:32px;';
+  avWrap.appendChild(av);
+
+  if(isMe){
+    const editAvBtn=document.createElement('button');editAvBtn.type='button';
+    editAvBtn.style.cssText='position:absolute;bottom:2px;right:2px;background:#1a1a1a;border:2px solid #fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:13px;color:#fff;display:flex;align-items:center;justify-content:center;';
+    editAvBtn.textContent='✎';editAvBtn.onclick=()=>setState({editing:true,editForm:{...userProf}});
+    avWrap.appendChild(editAvBtn);
+  }
+  card.appendChild(avWrap);
+
+  // Name + handle + grade
+  const nameRow=document.createElement('div');nameRow.style.cssText='display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;';
+  const nameLeft=document.createElement('div');
+  const nameEl=document.createElement('h2');nameEl.style.cssText='font-size:22px;font-weight:700;color:#1a1a1a;margin:0 0 2px;';nameEl.textContent=userProf.displayName||'';
+  const handleEl=document.createElement('div');handleEl.style.cssText='font-size:14px;color:#a09890;margin-bottom:6px;';handleEl.textContent='@'+(userProf.handle||'');
+  const gradeWrap=document.createElement('div');gradeWrap.style.cssText='display:flex;align-items:center;gap:6px;';
+  const gb=GradeBadge(userProf);if(gb)gradeWrap.appendChild(gb);
+  nameLeft.appendChild(nameEl);nameLeft.appendChild(handleEl);if(gb)nameLeft.appendChild(gradeWrap);
+  nameRow.appendChild(nameLeft);
+
+  // Edit / Follow button
+  if(isMe){
+    const eb=document.createElement('button');eb.type='button';eb.textContent='Éditer le profil';
+    eb.style.cssText='background:#fff;color:#1a1a1a;border:1.5px solid #d5cfc8;padding:9px 18px;border-radius:22px;font-size:13px;font-weight:500;cursor:pointer;';
+    eb.onclick=()=>setState({editing:true,editForm:{...userProf}});nameRow.appendChild(eb);
+  } else {
+    const followed=(me.followingIds||[]).includes(userProf.uid);
+    const fb=document.createElement('button');fb.type='button';fb.textContent=followed?'Abonné ✓':'Suivre';
+    fb.style.cssText='background:'+(followed?'#1a1a1a':'#fff')+';color:'+(followed?'#fff':'#1a1a1a')+';border:1.5px solid '+(followed?'#1a1a1a':'#d5cfc8')+';padding:9px 20px;border-radius:22px;font-size:13px;font-weight:600;cursor:pointer;';
+    fb.onclick=async()=>{
+      const myRef=doc(db,'users',STATE.currentUser.uid);const thRef=doc(db,'users',userProf.uid);
+      try{
+        if(followed){await updateDoc(myRef,{following:increment(-1),followingIds:arrayRemove(userProf.uid)});await updateDoc(thRef,{followers:increment(-1)});}
+        else{await updateDoc(myRef,{following:increment(1),followingIds:arrayUnion(userProf.uid)});await updateDoc(thRef,{followers:increment(1)});}
+        const ts=await getDoc(thRef);if(ts.exists())STATE.users[userProf.uid]={uid:userProf.uid,...ts.data()};render();
+      }catch(e){console.error(e);}
+    };
+    nameRow.appendChild(fb);
+  }
+  card.appendChild(nameRow);
+
+  // Bio
+  if(userProf.bio){const bio=document.createElement('p');bio.style.cssText="font-family:'Lora',serif;font-size:14px;color:#3a3430;line-height:1.6;margin:0 0 12px;";bio.textContent=userProf.bio;card.appendChild(bio);}
+
+  // Location, website, join date
+  const metaRow=document.createElement('div');metaRow.style.cssText='display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;';
+  const mkMeta=(icon,text)=>{if(!text)return;const s=document.createElement('span');s.style.cssText='font-size:13px;color:#a09890;display:flex;align-items:center;gap:4px;';s.innerHTML=icon+'<span>'+text+'</span>';metaRow.appendChild(s);};
+  mkMeta('📍',userProf.location);
+  if(userProf.website)mkMeta('🔗',userProf.website);
+  mkMeta('📅',userProf.joinDate?'Rejoint '+userProf.joinDate:'');
+  if(metaRow.children.length)card.appendChild(metaRow);
+
+  // Stats
+  const stats=document.createElement('div');stats.style.cssText='display:flex;gap:24px;padding:14px 0;border-top:1px solid #f5f2ee;border-bottom:1px solid #f5f2ee;';
+  const mkStat=(val,lbl)=>{const s=document.createElement('div');s.style.cssText='display:flex;gap:5px;align-items:baseline;';const v=document.createElement('span');v.style.cssText='font-size:17px;font-weight:700;color:#1a1a1a;';v.textContent=String(val||0);const l=document.createElement('span');l.style.cssText='font-size:13px;color:#a09890;';l.textContent=lbl;s.appendChild(v);s.appendChild(l);stats.appendChild(s);};
+  mkStat(STATE.posts.filter(p=>p.userId===userProf.uid).length,'Publications');
+  mkStat(userProf.followers||0,'Abonnés');
+  mkStat(userProf.following||0,'Abonnements');
+  card.appendChild(stats);
+  root.appendChild(card);
+
+  // Tabs
+  const tabs=['Publications','Enregistrés','Médias','À propos'];
+  const profTab=STATE.profileTab||'Publications';
+  const tabBar=document.createElement('div');tabBar.style.cssText='background:#fff;border-bottom:1px solid #f5f2ee;display:flex;margin-bottom:12px;';
+  tabs.forEach(t=>{
+    const tb=document.createElement('button');tb.type='button';tb.textContent=t;
+    const isActive=profTab===t;
+    tb.style.cssText='flex:1;padding:14px 8px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:'+(isActive?600:400)+';color:'+(isActive?'#1a1a1a':'#a09890')+';border-bottom:2px solid '+(isActive?'#1a1a1a':'transparent')+';transition:all 0.15s;';
+    tb.onclick=()=>setState({profileTab:t});tabBar.appendChild(tb);
   });
-  info.appendChild(stats);
-  root.appendChild(info);
+  root.appendChild(tabBar);
 
-  if(!myPosts.length) root.appendChild(p({...S.serif(14,'#a09890'),fontStyle:'italic',padding:'24px'},'Aucune publication.'));
-  else myPosts.forEach(post=>{
-    const pd=div({padding:'14px 16px',borderBottom:'1px solid #ede8e0'});
-    if(post.content) pd.appendChild(p({...S.serif(14,'#3a3430'),margin:'0 0 8px',lineHeight:1.7},post.content));
-    if(post.media?.url){
-      const mw=div({borderRadius:'8px',overflow:'hidden',marginBottom:'8px'});
-      mw.appendChild(post.media.type==='image'
-        ?el('img',{src:post.media.url,loading:'lazy',style:{width:'100%',maxHeight:'220px',objectFit:'cover',display:'block'}})
-        :el('video',{src:post.media.url,controls:true,style:{width:'100%',maxHeight:'220px',display:'block'}}));
-      pd.appendChild(mw);
+  // Posts grid
+  const userPosts=STATE.posts.filter(p=>p.userId===userProf.uid);
+  if(profTab==='Publications'){
+    if(!userPosts.length){
+      const empty=document.createElement('div');empty.style.cssText='text-align:center;padding:40px 20px;';
+      const et=document.createElement('p');et.style.cssText="font-family:'Lora',serif;font-size:14px;color:#a09890;font-style:italic;";et.textContent='Aucune publication.';empty.appendChild(et);root.appendChild(empty);
+    } else {
+      userPosts.forEach(post=>{
+        const card2=document.createElement('div');card2.style.cssText='background:#fff;border-radius:16px;padding:16px;margin:0 0 12px;';
+        if(post.content){const pc=document.createElement('p');pc.style.cssText="font-family:'Lora',serif;font-size:14px;color:#2a2420;line-height:1.6;margin:0 0 10px;";pc.textContent=post.content;card2.appendChild(pc);}
+        if(post.media?.url){
+          const mw=document.createElement('div');mw.style.cssText='border-radius:10px;overflow:hidden;background:#f0ebe4;';
+          if(post.media.type==='image'){const img=document.createElement('img');img.src=post.media.url;img.style.cssText='width:100%;max-height:400px;object-fit:contain;display:block;';mw.appendChild(img);}
+          else{const vid=document.createElement('video');vid.src=post.media.url;vid.controls=true;vid.style.cssText='width:100%;display:block;';mw.appendChild(vid);}
+          card2.appendChild(mw);
+        }
+        const acts=document.createElement('div');acts.style.cssText='display:flex;gap:16px;padding-top:10px;border-top:1px solid #f5f2ee;margin-top:10px;';
+        const liked2=(post.likedBy||[]).includes(STATE.currentUser.uid);
+        const lk=document.createElement('span');lk.style.cssText='font-size:13px;color:'+(liked2?'#e05c5c':'#7a7068')+';';lk.textContent=(liked2?'♥ ':'♡ ')+(post.likes||0);acts.appendChild(lk);
+        const cm=document.createElement('span');cm.style.cssText='font-size:13px;color:#7a7068;';cm.textContent='💬 '+(post.comments||[]).length;acts.appendChild(cm);
+        card2.appendChild(acts);root.appendChild(card2);
+      });
     }
-    pd.appendChild(el('span',{style:S.sans(11,'#c5bfb8')},`♡ ${post.likes||0}`));
-    root.appendChild(pd);
-  });
+  } else if(profTab==='À propos'){
+    const aboutCard=document.createElement('div');aboutCard.style.cssText='background:#fff;border-radius:16px;padding:20px;';
+    const mkRow=(icon,label,val)=>{if(!val)return;const r=document.createElement('div');r.style.cssText='display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #f5f2ee;';const ic=document.createElement('span');ic.textContent=icon;ic.style.cssText='font-size:18px;flex-shrink:0;';const d=document.createElement('div');const l=document.createElement('div');l.style.cssText='font-size:11px;color:#a09890;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;';l.textContent=label;const v=document.createElement('div');v.style.cssText='font-size:14px;color:#1a1a1a;';v.textContent=val;d.appendChild(l);d.appendChild(v);r.appendChild(ic);r.appendChild(d);aboutCard.appendChild(r);};
+    mkRow('📍','Localisation',userProf.location);mkRow('🔗','Site web',userProf.website);mkRow('📅','Membre depuis',userProf.joinDate);mkRow('📝','Bio',userProf.bio);
+    root.appendChild(aboutCard);
+  } else {
+    const empty=document.createElement('div');empty.style.cssText='text-align:center;padding:40px 20px;';
+    const et=document.createElement('p');et.style.cssText="font-family:'Lora',serif;font-size:14px;color:#a09890;font-style:italic;";et.textContent='Bientôt disponible.';empty.appendChild(et);root.appendChild(empty);
+  }
+
   return root;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// EDIT PROFILE
-// ══════════════════════════════════════════════════════════════════
 function renderEditProfile(){
-  const me=STATE.userProfile||{};
-  if(!STATE.editForm) STATE.editForm={
-    displayName:me.displayName||'',bio:me.bio||'',
-    location:me.location||'',website:me.website||'',
-    avatarColor:me.avatarColor||AV_COLORS[0],avatarFile:null,avatarPreview:me.photoURL||null
-  };
-  const ef=STATE.editForm;
-  const setEF=(k,v)=>{
-    STATE.editForm={...STATE.editForm,[k]:v};
-    // Don't re-render on text input, only on color/photo changes
-    if(k==='avatarColor'||k==='avatarPhoto'||k==='avatarFile'||k==='avatarPreview') render();
-  };
-  const root=div({paddingBottom:'40px'});
-
-  const tb=div({padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #ede8e0'});
-  tb.appendChild(btn({background:'none',border:'none',cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontSize:'13px',color:'#a09890',padding:'0'},'← Annuler',()=>setState({editing:false,editForm:null})));
-  tb.appendChild(el('span',{style:{...S.sans(13,'#2a2420',600)}},'Modifier le profil'));
+  const me = STATE.userProfile||{};
+  const ef = STATE.editForm||{...me};
+  if(!STATE.editForm) STATE.editForm={...me};
   let saving=false;
-  tb.appendChild(btn({...S.BTN,width:'auto',padding:'6px 16px',marginTop:'0'},'Enregistrer',async()=>{
-    if(saving)return;saving=true;
+
+  const root=document.createElement('div');root.style.cssText='background:#f0ebe3;min-height:100vh;';
+
+  // Header
+  const hd=document.createElement('div');hd.style.cssText='background:#fff;padding:16px 20px;border-bottom:1px solid #ede8e0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;';
+  const back=document.createElement('button');back.type='button';back.textContent='← Retour';
+  back.style.cssText='background:none;border:none;cursor:pointer;font-size:14px;color:#7a7068;';
+  back.onclick=()=>setState({editing:false,editForm:null});
+  const title=document.createElement('span');title.style.cssText='font-size:16px;font-weight:700;color:#1a1a1a;';title.textContent='Modifier le profil';
+  const saveBtn=document.createElement('button');saveBtn.type='button';saveBtn.textContent='Enregistrer';
+  saveBtn.style.cssText='background:#1a1a1a;color:#fff;border:none;padding:9px 20px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;';
+  saveBtn.onclick=async()=>{
+    if(saving)return;saving=true;saveBtn.style.opacity='0.6';saveBtn.textContent='…';
     try{
-      // Always read latest values from STATE.editForm
       const sf=STATE.editForm;
-      const upd={
-        displayName: (sf.displayName||'').trim()||me.displayName,
-        bio:         (sf.bio||'').trim(),
-        location:    (sf.location||'').trim(),
-        website:     (sf.website||'').trim(),
-        avatarColor: sf.avatarColor||me.avatarColor||AV_COLORS[0]
-      };
+      const upd={displayName:(sf.displayName||'').trim()||me.displayName,bio:(sf.bio||'').trim(),location:(sf.location||'').trim(),website:(sf.website||'').trim(),avatarColor:sf.avatarColor||me.avatarColor};
       if(sf.avatarFile){
-        // Avatar → base64 compressed
-        try {
-          upd.photoURL = await new Promise((res,rej)=>{
-            const img=new Image();
-            img.onload=()=>{
-              const SIZE=80;
-              const canvas=document.createElement('canvas');
-              canvas.width=SIZE;canvas.height=SIZE;
-              const ctx=canvas.getContext('2d');
-              const s=Math.min(img.width,img.height);
-              const ox=(img.width-s)/2, oy=(img.height-s)/2;
-              ctx.drawImage(img,ox,oy,s,s,0,0,SIZE,SIZE);
-              let q=0.5, data=canvas.toDataURL('image/jpeg',q);
-              while(data.length>700000&&q>0.1){q-=0.1;data=canvas.toDataURL('image/jpeg',q);}
-              res(data);
-            };
-            img.onerror=rej;
-            img.src=URL.createObjectURL(sf.avatarFile);
-          });
-          if(upd.photoURL&&upd.photoURL.length>900000){
-            toast('Photo trop lourde',true);saving=false;return;
-          }
-        } catch(e){ toast('Erreur photo',true);saving=false;return; }
+        upd.photoURL=await new Promise((res,rej)=>{
+          const img=new Image();img.onload=()=>{const SIZE=80;const c=document.createElement('canvas');c.width=SIZE;c.height=SIZE;const ctx=c.getContext('2d');const s=Math.min(img.width,img.height);ctx.drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,SIZE,SIZE);let q=0.5,d=c.toDataURL('image/jpeg',q);while(d.length>700000&&q>0.1){q-=0.1;d=c.toDataURL('image/jpeg',q);}res(d);};img.onerror=rej;img.src=URL.createObjectURL(sf.avatarFile);
+        });
       }
       await updateDoc(doc(db,'users',STATE.currentUser.uid),upd);
       await updateProfile(STATE.currentUser,{displayName:upd.displayName,...(upd.photoURL?{photoURL:upd.photoURL}:{})});
-      STATE.userProfile={...STATE.userProfile,...upd};
-      STATE.users[STATE.currentUser.uid]=STATE.userProfile;
-      toast('Profil mis à jour !');
-      setState({editing:false,editForm:null});
+      STATE.userProfile={...STATE.userProfile,...upd};STATE.users[STATE.currentUser.uid]=STATE.userProfile;
+      toast('Profil mis à jour !');setState({editing:false,editForm:null});
     }catch(e){toast('Erreur : '+e.message,true);console.error(e);}
-    saving=false;
-  }));
-  root.appendChild(tb);
-
-  // Avatar preview
-  const avW=div({display:'flex',flexDirection:'column',alignItems:'center',padding:'24px 0 16px'});
-  const avPreview={...me,...ef,photoURL:ef.avatarPreview};
-  const avClick=div({position:'relative',cursor:'pointer'});
-  avClick.appendChild(Avatar(avPreview,76));
-  avClick.appendChild(div({position:'absolute',inset:'0',borderRadius:'50%',background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center'},[el('span',{style:{fontSize:'18px'}},'📷')]));
-  const fileInp=el('input',{type:'file',accept:'image/*',style:{display:'none'}});
-  fileInp.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;setEF('avatarFile',f);setEF('avatarPreview',URL.createObjectURL(f));e.target.value='';});
-  avClick.addEventListener('click',()=>fileInp.click());
-  avW.appendChild(avClick);avW.appendChild(fileInp);
-  avW.appendChild(el('span',{style:{...S.sans(11,'#a09890'),marginTop:'8px'}},'Appuyer pour changer'));
-  if(ef.avatarPreview&&ef.avatarFile) avW.appendChild(btn({...S.LINK,fontSize:'11px',marginTop:'4px'},'✕ Retirer',()=>setEF('avatarPreview',null)));
-  root.appendChild(avW);
-
-  // Colors
-  if(!ef.avatarPreview){
-    const cp=div({padding:'0 16px 16px'});
-    cp.appendChild(el('label',{style:S.LBL},"Couleur de l'avatar"));
-    const row=div({display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'6px'});
-    AV_COLORS.forEach(c=>{
-      const dot=div({width:'28px',height:'28px',borderRadius:'50%',background:c,cursor:'pointer',border:ef.avatarColor===c?'3px solid #2a2420':'2px solid transparent',boxShadow:ef.avatarColor===c?'0 0 0 2px #fff':'none',transition:'all 0.15s'});
-      dot.addEventListener('click',()=>setEF('avatarColor',c));
-      row.appendChild(dot);
-    });
-    cp.appendChild(row);
-    root.appendChild(cp);
-  }
-
-  const mkF=(label,key,type,ph)=>{
-    const w=div({marginBottom:'18px'});
-    w.appendChild(el('label',{style:S.LBL},label));
-    const inp=el('input',{type:type||'text',value:ef[key]||'',placeholder:ph||'',style:{width:'100%',border:'none',borderBottom:'1.5px solid #d5cfc8',outline:'none',padding:'8px 0',fontFamily:"'Lora',serif",fontSize:'14px',color:'#2a2420',background:'transparent',display:'block'}});
-    inp.addEventListener('input',e=>{ if(STATE.editForm) STATE.editForm[key]=e.target.value; });
-    w.appendChild(inp);
-    return w;
+    saving=false;saveBtn.style.opacity='1';saveBtn.textContent='Enregistrer';
   };
-  const fields=div({padding:'0 16px'});
-  fields.appendChild(mkF('Nom complet','displayName','text','Votre nom'));
-  const bioW=div({marginBottom:'18px'});
-  bioW.appendChild(el('label',{style:S.LBL},'Bio'));
-  const bioTA=el('textarea',{placeholder:'En quelques mots…',rows:3,style:{width:'100%',border:'none',borderBottom:'1.5px solid #d5cfc8',outline:'none',padding:'8px 0',fontFamily:"'Lora',serif",fontSize:'14px',color:'#2a2420',background:'transparent',resize:'none',lineHeight:1.6,display:'block'}});
-  bioTA.value=ef.bio||'';bioTA.addEventListener('input',e=>{ if(STATE.editForm) STATE.editForm.bio=e.target.value; });
-  bioW.appendChild(bioTA);fields.appendChild(bioW);
-  fields.appendChild(mkF('Localisation','location','text','Paris, France'));
-  fields.appendChild(mkF('Site web','website','url','https://votre-site.com'));
-  root.appendChild(fields);
-  return root;
+  hd.appendChild(back);hd.appendChild(title);hd.appendChild(saveBtn);root.appendChild(hd);
+
+  // Form card
+  const card=document.createElement('div');card.style.cssText='background:#fff;margin:12px;border-radius:16px;overflow:hidden;';
+
+  // Avatar section
+  const avSec=document.createElement('div');avSec.style.cssText='padding:24px 20px;border-bottom:1px solid #f5f2ee;display:flex;align-items:center;gap:16px;';
+  const avWrap=document.createElement('div');avWrap.style.cssText='position:relative;cursor:pointer;';
+  const avEl=Avatar(STATE.editForm||me,72);avEl.style.cssText='width:72px;height:72px;border-radius:50%;overflow:hidden;font-size:24px;';avWrap.appendChild(avEl);
+  const avOverlay=document.createElement('div');avOverlay.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,0.35);border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s;';
+  avOverlay.innerHTML='<span style="color:#fff;font-size:18px;">✎</span>';
+  avWrap.appendChild(avOverlay);
+  avWrap.onmouseenter=()=>avOverlay.style.opacity='1';avWrap.onmouseleave=()=>avOverlay.style.opacity='0';
+  const avInp=document.createElement('input');avInp.type='file';avInp.accept='image/*';avInp.style.display='none';
+  avInp.addEventListener('change',e=>{const f=e.target.files[0];if(f){STATE.editForm.avatarFile=f;const url=URL.createObjectURL(f);if(avEl.tagName==='IMG')avEl.src=url;avEl.style.backgroundImage='url('+url+')';}});
+  avWrap.appendChild(avInp);avWrap.onclick=()=>avInp.click();
+  avSec.appendChild(avWrap);
+  const avHint=document.createElement('div');
+  const ah1=document.createElement('div');ah1.style.cssText='font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:3px;';ah1.textContent='Photo de profil';
+  const ah2=document.createElement('div');ah2.style.cssText='font-size:12px;color:#a09890;';ah2.textContent='Cliquez pour changer';
+  avHint.appendChild(ah1);avHint.appendChild(ah2);avSec.appendChild(avHint);
+  card.appendChild(avSec);
+
+  // Fields
+  const mkField=(label,key,type='text',ph='')=>{
+    const f=document.createElement('div');f.style.cssText='padding:16px 20px;border-bottom:1px solid #f5f2ee;';
+    const l=document.createElement('label');l.style.cssText='display:block;font-size:11px;font-weight:600;color:#a09890;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;';l.textContent=label;
+    const inp=document.createElement(type==='textarea'?'textarea':'input');
+    if(type!=='textarea'){inp.type=type;inp.value=(STATE.editForm||{})[key]||'';}
+    else{inp.value=(STATE.editForm||{})[key]||'';inp.rows=3;}
+    inp.placeholder=ph;
+    inp.style.cssText='width:100%;border:none;outline:none;font-size:15px;color:#1a1a1a;background:transparent;resize:none;font-family:inherit;box-sizing:border-box;';
+    inp.addEventListener('input',e=>{if(STATE.editForm)STATE.editForm[key]=e.target.value;});
+    f.appendChild(l);f.appendChild(inp);card.appendChild(f);
+  };
+  mkField('Nom complet','displayName','text','Votre nom');
+  mkField('Identifiant (@)','handle','text','votre_pseudo');
+  mkField('Bio','bio','textarea','Parlez de vous...');
+  mkField('Localisation','location','text','Ville, Pays');
+  mkField('Site web','website','url','https://...');
+  root.appendChild(card);return root;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// EXPLORE
-// ══════════════════════════════════════════════════════════════════
 function renderExplore(){
-  const me=STATE.userProfile||{};
+  const me = STATE.userProfile||{};
   const q=(STATE.exploreSearch||'').toLowerCase().trim();
   const allUsers=Object.values(STATE.users).filter(u=>{
-    if(u.uid===STATE.currentUser.uid||!u.handle) return false;
-    if(!q) return true;
+    if(u.uid===STATE.currentUser?.uid||!u.handle)return false;
+    if(!q)return true;
     return (u.handle||'').toLowerCase().includes(q)||(u.displayName||'').toLowerCase().includes(q);
   });
-  const root=div({});
 
-  // Search bar — no re-render on keystroke, filter on submit/enter only
-  const searchBar=div({padding:'14px 16px',borderBottom:'1px solid #ede8e0',background:'#faf7f3'});
-  const searchWrap=div({display:'flex',alignItems:'center',gap:'10px',background:'#f0ebe4',borderRadius:'20px',padding:'8px 14px'});
-  const searchInp=el('input',{type:'search',placeholder:'Rechercher un pseudo...',value:STATE.exploreSearch||'',style:{flex:1,border:'none',outline:'none',background:'transparent',fontFamily:"'DM Sans',sans-serif",fontSize:'14px',color:'#2a2420'}});
-  // Update state without re-render on each keystroke
-  searchInp.addEventListener('input',e=>{ STATE.exploreSearch=e.target.value; filterExplore(root, list, me); });
-  searchWrap.appendChild(el('span',{style:{fontSize:'14px',color:'#a09890',flexShrink:0}},'🔍'));
-  searchWrap.appendChild(searchInp);
-  const clrBtn=div({cursor:'pointer',color:'#a09890',fontSize:'16px',flexShrink:0,display:STATE.exploreSearch?'block':'none'},['✕']);
-  clrBtn.addEventListener('click',()=>{ STATE.exploreSearch=''; searchInp.value=''; filterExplore(root, list, me); clrBtn.style.display='none'; });
-  searchWrap.appendChild(clrBtn);
-  searchBar.appendChild(searchWrap);
-  root.appendChild(searchBar);
+  const root=document.createElement('div');root.style.cssText='background:#f0ebe3;min-height:100%;';
 
-  const list=div({padding:'0 16px'});
-  buildExploreList(list, me, allUsers, q);
-  if(!q) getDocs(collection(db,'users')).then(snap=>{snap.forEach(d=>{if(d.id!==STATE.currentUser.uid) STATE.users[d.id]={uid:d.id,...d.data()};});filterExplore(root,list,me);}).catch(()=>{});
-  root.appendChild(list);
-  return root;
-}
+  // Header
+  const hd=document.createElement('div');hd.style.cssText='background:#fff;padding:18px 20px 14px;border-bottom:1px solid #f5f2ee;';
+  const title=document.createElement('h2');title.style.cssText='font-size:18px;font-weight:700;color:#1a1a1a;margin:0 0 12px;';title.textContent='Explorer';hd.appendChild(title);
 
-function filterExplore(root, list, me) {
-  const q=(STATE.exploreSearch||'').toLowerCase().trim();
-  const allUsers=Object.values(STATE.users).filter(u=>{
-    if(u.uid===STATE.currentUser.uid||!u.handle) return false;
-    if(!q) return true;
-    return (u.handle||'').toLowerCase().includes(q)||(u.displayName||'').toLowerCase().includes(q);
-  });
-  list.innerHTML='';
-  buildExploreList(list, me, allUsers, q);
-}
+  // Search
+  const sw=document.createElement('div');sw.style.cssText='display:flex;align-items:center;gap:10px;background:#f5f2ee;border-radius:22px;padding:10px 18px;';
+  const si=document.createElement('span');si.textContent='🔍';si.style.cssText='color:#a09890;font-size:14px;flex-shrink:0;';
+  const sinp=document.createElement('input');sinp.type='search';sinp.placeholder='Rechercher un pseudo...';sinp.value=STATE.exploreSearch||'';
+  sinp.style.cssText='border:none;outline:none;background:transparent;font-size:14px;color:#1a1a1a;flex:1;';
+  const list=document.createElement('div');list.style.cssText='background:#fff;margin-top:12px;border-radius:16px;overflow:hidden;';
+  sinp.addEventListener('input',e=>{STATE.exploreSearch=e.target.value;filterExplore(null,list,me);});
+  sw.appendChild(si);sw.appendChild(sinp);
+  if(STATE.exploreSearch){const clr=document.createElement('button');clr.type='button';clr.textContent='✕';clr.style.cssText='background:none;border:none;cursor:pointer;font-size:14px;color:#a09890;';clr.onclick=()=>{STATE.exploreSearch='';sinp.value='';filterExplore(null,list,me);};sw.appendChild(clr);}
+  hd.appendChild(sw);root.appendChild(hd);
 
-function buildExploreList(list, me, allUsers, q) {
+  if(q)root.appendChild(Object.assign(document.createElement('div'),{style:'font-size:12px;color:#a09890;padding:12px 20px;',textContent:allUsers.length+' résultat'+(allUsers.length>1?'s':'')}));
+
   if(!allUsers.length){
-    list.appendChild(div({padding:'40px 0',display:'flex',flexDirection:'column',alignItems:'center',gap:'10px'},[
-      el('div',{style:{fontSize:'28px',opacity:'0.3'}},'◎'),
-      p({fontFamily:"'Lora',serif",fontSize:'14px',color:'#a09890',fontStyle:'italic',textAlign:'center'},q?'Aucun résultat pour "'+q+'"':'Aucun profil trouvé.')
-    ]));
-    return;
+    getDocs(collection(db,'users')).then(snap=>{snap.forEach(d=>{if(d.id!==STATE.currentUser?.uid)STATE.users[d.id]={uid:d.id,...d.data()};});filterExplore(null,list,me);}).catch(()=>{});
+    list.appendChild(Object.assign(document.createElement('p'),{style:"font-family:'Lora',serif;font-size:14px;color:#a09890;font-style:italic;text-align:center;padding:40px 20px;",textContent:q?'Aucun résultat.':'Chargement...'}));
+  } else {
+    buildExploreList(list,me,allUsers,q);
   }
-  if(q) list.appendChild(el('div',{style:{fontFamily:"'DM Sans',sans-serif",fontSize:'11px',color:'#a09890',padding:'12px 0 4px'}},allUsers.length+' résultat'+(allUsers.length>1?'s':'')));
-  allUsers.forEach(u=>{
+  root.appendChild(list);return root;
+}
+
+function filterExplore(root,list,me){
+  const q=(STATE.exploreSearch||'').toLowerCase().trim();
+  const allUsers=Object.values(STATE.users).filter(u=>{
+    if(u.uid===STATE.currentUser?.uid||!u.handle)return false;
+    if(!q)return true;
+    return (u.handle||'').toLowerCase().includes(q)||(u.displayName||'').toLowerCase().includes(q);
+  });
+  list.innerHTML='';buildExploreList(list,me,allUsers,q);
+}
+
+function buildExploreList(list,me,allUsers,q){
+  if(!allUsers.length){const p=document.createElement('p');p.style.cssText="font-family:'Lora',serif;font-size:14px;color:#a09890;font-style:italic;text-align:center;padding:40px 20px;";p.textContent=q?'Aucun résultat pour "'+q+'"':'Aucun profil trouvé.';list.appendChild(p);return;}
+  allUsers.forEach((u,i)=>{
     const followed=(me.followingIds||[]).includes(u.uid);
-    const row=div({display:'flex',gap:'12px',alignItems:'flex-start',padding:'12px 0',borderBottom:'1px solid #ede8e0'});
-    const cz=div({display:'flex',gap:'12px',alignItems:'flex-start',flex:1,cursor:'pointer',minWidth:0});
-    cz.appendChild(Avatar(u,42));
-    const info=div({flex:1,minWidth:0});
-    const nh=div({display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginBottom:'2px'});
-    nh.appendChild(el('span',{style:{...S.sans(14,'#2a2420',600)}},u.displayName||''));
-    if(u.handle) nh.appendChild(el('span',{style:S.sans(12,'#a09890')},'@'+u.handle));
-    const egb=GradeBadge(u,true); if(egb) nh.appendChild(egb);
-    info.appendChild(nh);
-    if(u.bio) info.appendChild(p({...S.serif(12,'#5a504a'),margin:'0 0 3px',lineHeight:1.5},u.bio));
-    info.appendChild(el('div',{style:S.sans(11,'#c5bfb8')},(u.followers||0)+' abonnés'));
-    cz.appendChild(info);
-    cz.addEventListener('click',()=>setState({profileUid:u.uid,tab:'profile'}));
-    row.appendChild(cz);
-    row.appendChild(btn({background:followed?'#2a2420':'none',border:'1px solid '+(followed?'#2a2420':'#d5cfc8'),padding:'5px 12px',borderRadius:'16px',fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:followed?'#f5f0ea':'#5a504a',cursor:'pointer',flexShrink:0,transition:'all 0.2s'},followed?'Abonné ✓':'Suivre',async()=>{
-      const myRef=doc(db,'users',STATE.currentUser.uid);
-      const thRef=doc(db,'users',u.uid);
+    const row=document.createElement('div');row.style.cssText='display:flex;gap:14px;align-items:center;padding:14px 20px;'+(i<allUsers.length-1?'border-bottom:1px solid #f5f2ee;':'');
+    const avEl=Avatar(u,48);avEl.style.cursor='pointer';avEl.onclick=()=>setState({profileUid:u.uid,tab:'profile'});row.appendChild(avEl);
+    const info=document.createElement('div');info.style.cssText='flex:1;min-width:0;cursor:pointer;';info.onclick=()=>setState({profileUid:u.uid,tab:'profile'});
+    const nh=document.createElement('div');nh.style.cssText='display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;';
+    const ns=document.createElement('span');ns.style.cssText='font-size:14px;font-weight:600;color:#1a1a1a;';ns.textContent=u.displayName||'';
+    nh.appendChild(ns);const egb=GradeBadge(u,true);if(egb)nh.appendChild(egb);
+    const hs=document.createElement('div');hs.style.cssText='font-size:12px;color:#a09890;';hs.textContent='@'+(u.handle||'')+' · '+(u.followers||0)+' abonnés';
+    if(u.bio){const bs=document.createElement('div');bs.style.cssText="font-size:12px;color:#7a7068;margin-top:2px;font-family:'Lora',serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";bs.textContent=u.bio;info.appendChild(nh);info.appendChild(hs);info.appendChild(bs);}
+    else{info.appendChild(nh);info.appendChild(hs);}
+    row.appendChild(info);
+    const fb=document.createElement('button');fb.type='button';fb.textContent=followed?'Abonné':'Suivre';
+    fb.style.cssText='background:'+(followed?'#1a1a1a':'#fff')+';color:'+(followed?'#fff':'#1a1a1a')+';border:1.5px solid '+(followed?'#1a1a1a':'#d5cfc8')+';padding:7px 16px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;flex-shrink:0;white-space:nowrap;';
+    fb.onclick=async()=>{
+      const myRef=doc(db,'users',STATE.currentUser.uid);const thRef=doc(db,'users',u.uid);
       try{
-        if(followed){
-          await updateDoc(myRef,{following:increment(-1),followingIds:arrayRemove(u.uid)});
-          await updateDoc(thRef,{followers:increment(-1)});
-        }else{
-          await updateDoc(myRef,{following:increment(1),followingIds:arrayUnion(u.uid)});
-          await updateDoc(thRef,{followers:increment(1)});
-        }
-        const thSnap=await getDoc(thRef);
-        if(thSnap.exists()) STATE.users[u.uid]={uid:u.uid,...thSnap.data()};
-        render();
+        if(followed){await updateDoc(myRef,{following:increment(-1),followingIds:arrayRemove(u.uid)});await updateDoc(thRef,{followers:increment(-1)});}
+        else{await updateDoc(myRef,{following:increment(1),followingIds:arrayUnion(u.uid)});await updateDoc(thRef,{followers:increment(1)});}
+        const ts=await getDoc(thRef);if(ts.exists())STATE.users[u.uid]={uid:u.uid,...ts.data()};render();
       }catch(e){console.error(e);}
-    }));
-    list.appendChild(row);
+    };
+    row.appendChild(fb);list.appendChild(row);
   });
 }
 
-// ══════════════════════════════════════════════════════════════════
-// MESSAGES (local pour l'instant — Firestore-ready)
-// ══════════════════════════════════════════════════════════════════
-// ── Messaging helpers ─────────────────────────────────────────────
-function convKey(uid1, uid2) {
-  return [uid1, uid2].sort().join('_');
-}
-
-function getMutualFollows() {
-  const me = STATE.userProfile || {};
-  const myFollowing = me.followingIds || [];
-  const iAmAdmin = me.isAdmin || me.isSuperAdmin;
-  return Object.values(STATE.users).filter(u => {
-    if (u.uid === STATE.currentUser?.uid) return false;
-    if (!u.handle) return false;
-    const theyFollowMe = (u.followingIds || []).includes(STATE.currentUser?.uid);
-    const iFollowThem = myFollowing.includes(u.uid);
-    // Admin/SuperAdmin can message anyone they follow (one-way is enough)
-    if (iAmAdmin) return iFollowThem || theyFollowMe;
-    // SuperAdmins/Admins appear in everyone's list if there is mutual follow
-    if (u.isAdmin || u.isSuperAdmin) return iFollowThem && theyFollowMe;
-    // Normal users: strict mutual follow required
-    return theyFollowMe && iFollowThem;
-  });
-}
-
-// Subscribe to a conversation in real-time
-function subscribeToConv(uid) {
-  if (unsubConv) { unsubConv(); unsubConv = null; }
-  const key = convKey(STATE.currentUser.uid, uid);
-  const convRef = doc(db, 'conversations', key);
-  unsubConv = onSnapshot(convRef, snap => {
-    if (snap.exists()) {
-      STATE.msgConvs[key] = snap.data();
-    } else {
-      STATE.msgConvs[key] = { messages: [] };
-    }
-    // Always do partial update - NEVER full render during conversation
-    // Full render would destroy the input field and kill the keyboard on mobile
-    const msgsList = document.getElementById('conv-messages');
-    if (msgsList) {
-      updateMessagesList(msgsList, uid);
-    }
-    // If not in conversation view anymore, do nothing
-    // render() will be called naturally on next tab switch
-  });
-}
-
-function updateMessagesList(container, uid) {
-  const messages = getConvMessages(uid);
-  container.innerHTML = '';
-  if (!messages.length) {
-    const empty = document.createElement('div');
-    empty.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:8px;padding:40px 0;';
-    const icon = document.createElement('div');
-    icon.textContent = '◇'; icon.style.cssText = 'font-size:28px;opacity:0.3;';
-    const txt = document.createElement('p');
-    txt.textContent = 'Commencez la conversation';
-    txt.style.cssText = "font-family:'Lora',serif;font-size:13px;color:#c5bfb8;font-style:italic;";
-    empty.appendChild(icon); empty.appendChild(txt);
-    container.appendChild(empty);
-    return;
-  }
-  const key = convKey(STATE.currentUser.uid, uid);
-  messages.forEach((m, idx) => {
-    const isMe = m.senderId === STATE.currentUser.uid;
-    const mb = document.createElement('div');
-    mb.style.cssText = 'display:flex;justify-content:'+(isMe?'flex-end':'flex-start')+';align-items:flex-end;gap:6px;';
-    const ts = m.ts ? new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
-    const bubbleWrap = document.createElement('div');
-    bubbleWrap.style.maxWidth = '72%';
-    const bubble = document.createElement('div');
-    bubble.style.cssText = 'padding:9px 13px;border-radius:'+(isMe?'16px 16px 3px 16px':'16px 16px 16px 3px')+';background:'+(isMe?'#2a2420':'#f0ebe4')+";font-family:'Lora',serif;font-size:14px;line-height:1.6;color:"+(isMe?'#f5f0ea':'#3a3430')+';';
-    bubble.textContent = m.text;
-    const timeEl = document.createElement('div');
-    timeEl.style.cssText = "font-family:'DM Sans',sans-serif;font-size:9px;color:"+(isMe?'rgba(245,240,234,0.5)':'#c5bfb8')+';margin-top:3px;text-align:'+(isMe?'right':'left')+';';
-    timeEl.textContent = ts;
-    bubbleWrap.appendChild(bubble);
-    bubbleWrap.appendChild(timeEl);
-    if (isMe) {
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button'; delBtn.textContent = '✕';
-      delBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:#c5bfb8;font-size:11px;padding:0 4px;align-self:center;flex-shrink:0;opacity:0;transition:opacity 0.2s;';
-      delBtn.onclick = async () => {
-        const updated = messages.filter((_,i) => i !== idx);
-        try { await updateDoc(doc(db,'conversations',key),{messages:updated}); } catch(e){console.error(e);}
-      };
-      mb.appendChild(delBtn);
-      mb.appendChild(bubbleWrap);
-      mb.onmouseenter = () => delBtn.style.opacity = '1';
-      mb.onmouseleave = () => delBtn.style.opacity = '0';
-    } else {
-      mb.appendChild(bubbleWrap);
-    }
-    container.appendChild(mb);
-  });
-  container.scrollTop = container.scrollHeight;
-}
-
-function getConvMessages(uid) {
-  const key = convKey(STATE.currentUser.uid, uid);
-  return (STATE.msgConvs[key] || { messages: [] }).messages || [];
-}
-
-// ── MESSAGES VIEW ─────────────────────────────────────────────────
 function renderMessages() {
   const mutual = getMutualFollows();
   const activeUid = STATE.msgActive;
-
-  // If a conversation is open, show it full screen
-  if (activeUid) {
-    return renderConversation(activeUid);
-  }
-
-  // Unsubscribe from any active conv listener when back on list
+  if (activeUid) return renderConversation(activeUid);
   if (unsubConv) { unsubConv(); unsubConv = null; }
 
-  const root = div({ minHeight: '400px' });
+  const root = document.createElement('div');
+  root.style.cssText = 'background:#f0ebe3;min-height:100%;';
 
   // Header
-  const hd = div({ padding: '18px 16px 12px', borderBottom: '1px solid #ede8e0' });
-  hd.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '11px', fontWeight: 600, color: '#a09890', textTransform: 'uppercase', letterSpacing: '0.1em' } }, 'Messages'));
-  root.appendChild(hd);
+  const hd=document.createElement('div');hd.style.cssText='background:#fff;padding:18px 20px;border-bottom:1px solid #f5f2ee;display:flex;align-items:center;justify-content:space-between;';
+  const title=document.createElement('h2');title.style.cssText='font-size:18px;font-weight:700;color:#1a1a1a;margin:0;';title.textContent='Messages';
+  hd.appendChild(title);root.appendChild(hd);
 
-  if (!mutual.length) {
-    const empty = div({ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 28px', gap: '12px' });
-    empty.appendChild(el('div', { style: { fontSize: '36px', opacity: '0.3' } }, '◇'));
-    empty.appendChild(p({ fontFamily: "'Lora',serif", fontSize: '14px', color: '#a09890', fontStyle: 'italic', textAlign: 'center' }, 'Aucune conversation disponible.'));
-    empty.appendChild(p({ fontFamily: "'DM Sans',sans-serif", fontSize: '12px', color: '#c5bfb8', textAlign: 'center' }, 'Suivez-vous mutuellement pour envoyer des messages.'));
-    root.appendChild(empty);
-    return root;
+  // Search bar
+  const sb=document.createElement('div');sb.style.cssText='background:#fff;padding:12px 16px;border-bottom:1px solid #f5f2ee;';
+  const sw=document.createElement('div');sw.style.cssText='display:flex;align-items:center;gap:10px;background:#f5f2ee;border-radius:22px;padding:9px 16px;';
+  const si=document.createElement('span');si.textContent='🔍';si.style.cssText='color:#a09890;font-size:14px;flex-shrink:0;';
+  const sinp=document.createElement('input');sinp.type='text';sinp.placeholder='Rechercher...';sinp.style.cssText='border:none;outline:none;background:transparent;font-size:14px;color:#1a1a1a;flex:1;';
+  sw.appendChild(si);sw.appendChild(sinp);sb.appendChild(sw);root.appendChild(sb);
+
+  if(!mutual.length){
+    const empty=document.createElement('div');empty.style.cssText='display:flex;flex-direction:column;align-items:center;padding:60px 28px;gap:14px;';
+    const ic=document.createElement('div');ic.style.cssText='font-size:40px;opacity:0.3;';ic.textContent='✉';
+    const p1=document.createElement('p');p1.style.cssText="font-family:'Lora',serif;font-size:15px;color:#a09890;font-style:italic;text-align:center;";p1.textContent='Aucune conversation disponible.';
+    const p2=document.createElement('p');p2.style.cssText="font-family:'DM Sans',sans-serif;font-size:13px;color:#c5bfb8;text-align:center;";p2.textContent='Suivez-vous mutuellement pour envoyer des messages.';
+    empty.appendChild(ic);empty.appendChild(p1);empty.appendChild(p2);root.appendChild(empty);return root;
   }
 
-  mutual.forEach(u => {
-    const messages = getConvMessages(u.uid);
-    const last = messages[messages.length - 1];
-    const unread = messages.filter(m => m.senderId !== STATE.currentUser.uid && !m.read).length;
+  // Conversations list
+  const list=document.createElement('div');list.style.cssText='background:#fff;';
+  mutual.forEach(u=>{
+    const messages=getConvMessages(u.uid);
+    const last=messages[messages.length-1];
+    const unread=messages.filter(m=>m.senderId!==STATE.currentUser.uid&&!m.read).length;
+    const row=document.createElement('div');row.style.cssText='display:flex;gap:14px;align-items:center;padding:14px 20px;border-bottom:1px solid #f5f2ee;cursor:pointer;transition:background 0.15s;';
+    row.onmouseenter=()=>row.style.background='#faf7f3';row.onmouseleave=()=>row.style.background='transparent';
+    row.addEventListener('click',()=>{subscribeToConv(u.uid);setState({msgActive:u.uid});});
 
-    const row = div({ display: 'flex', gap: '14px', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #ede8e0', cursor: 'pointer' });
-    row.addEventListener('click', () => {
-      subscribeToConv(u.uid);
-      setState({ msgActive: u.uid });
-    });
-    row.onmouseenter = () => row.style.background = '#f5f0ea';
-    row.onmouseleave = () => row.style.background = 'transparent';
-    row.appendChild(Avatar(u, 46));
+    // Avatar with online indicator
+    const avWrap=document.createElement('div');avWrap.style.cssText='position:relative;flex-shrink:0;';
+    avWrap.appendChild(Avatar(u,48));
+    avWrap.appendChild(row);
 
-    const info = div({ flex: 1, minWidth: '0' });
-    const nameRow = div({ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' });
-    nameRow.appendChild(el('span', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: 600, color: '#2a2420' } }, u.displayName || ''));
-    nameRow.appendChild(el('span', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#a09890' } }, '@' + (u.handle || '')));
-    const mlgb=GradeBadge(u,true); if(mlgb) nameRow.appendChild(mlgb);
+    const avEl=Avatar(u,48);avEl.style.flexShrink='0';
+    const info=document.createElement('div');info.style.cssText='flex:1;min-width:0;';
+    const nameRow=document.createElement('div');nameRow.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;';
+    const nameEl=document.createElement('span');nameEl.style.cssText='font-size:14px;font-weight:'+(unread?700:600)+';color:#1a1a1a;';nameEl.textContent=u.displayName||'';
+    const timeEl=document.createElement('span');timeEl.style.cssText='font-size:11px;color:#a09890;flex-shrink:0;';
+    if(last?.ts){const d=new Date(last.ts),diff=Date.now()-d.getTime();timeEl.textContent=diff<3600000?Math.floor(diff/60000)+'min':diff<86400000?Math.floor(diff/3600000)+'h':Math.floor(diff/86400000)+'j';}
+    nameRow.appendChild(nameEl);nameRow.appendChild(timeEl);
     info.appendChild(nameRow);
-    if (last) {
-      const isMe = last.senderId === STATE.currentUser.uid;
-      info.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '12px', color: unread ? '#2a2420' : '#a09890', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: unread ? 600 : 400 } }, (isMe ? 'Vous : ' : '') + last.text));
-    } else {
-      info.appendChild(el('div', { style: { fontFamily: "'Lora',serif", fontSize: '12px', color: '#c5bfb8', fontStyle: 'italic' } }, 'Commencer la conversation'));
-    }
-    row.appendChild(info);
-    if (unread > 0) {
-      row.appendChild(div({ background: '#c17a4a', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans',sans-serif", fontSize: '10px', fontWeight: 600, flexShrink: 0 }, [String(unread)]));
-    } else {
-      row.appendChild(el('span', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '16px', color: '#c5bfb8' } }, '›'));
-    }
-    root.appendChild(row);
-  });
+    const preview=document.createElement('div');preview.style.cssText='font-size:13px;color:'+(unread?'#1a1a1a':'#a09890')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:'+(unread?600:400)+';display:flex;align-items:center;gap:6px;';
+    if(last){const isMe=last.senderId===STATE.currentUser.uid;const txt=document.createElement('span');txt.textContent=(isMe?'Vous : ':'')+last.text;txt.style.overflow='hidden';txt.style.textOverflow='ellipsis';txt.style.whiteSpace='nowrap';preview.appendChild(txt);}
+    else{const noMsg=document.createElement('span');noMsg.style.cssText="font-style:italic;color:#c5bfb8;font-family:'Lora',serif;";noMsg.textContent='Commencer la conversation';preview.appendChild(noMsg);}
+    info.appendChild(preview);
 
-  return root;
+    const rowInner=document.createElement('div');rowInner.style.cssText='display:flex;gap:14px;align-items:center;padding:14px 20px;border-bottom:1px solid #f5f2ee;cursor:pointer;transition:background 0.15s;width:100%;';
+    rowInner.onmouseenter=()=>rowInner.style.background='#faf7f3';rowInner.onmouseleave=()=>rowInner.style.background='transparent';
+    rowInner.addEventListener('click',()=>{subscribeToConv(u.uid);setState({msgActive:u.uid});});
+    rowInner.appendChild(avEl);rowInner.appendChild(info);
+    if(unread>0){const badge=document.createElement('span');badge.style.cssText='background:#c17a4a;color:#fff;border-radius:50%;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;';badge.textContent=String(unread);rowInner.appendChild(badge);}
+    list.appendChild(rowInner);
+  });
+  root.appendChild(list);return root;
 }
 
-// ── CONVERSATION VIEW (Firebase real-time) ───────────────────────
 function renderConversation(uid) {
-  const u = STATE.users[uid] || { displayName: '?', handle: '?' };
+  const u = STATE.users[uid]||{displayName:'?',handle:'?'};
   const messages = getConvMessages(uid);
   const key = convKey(STATE.currentUser.uid, uid);
+  const hasUnread = messages.some(m=>m.senderId!==STATE.currentUser.uid&&!m.read);
+  if(hasUnread){const updated=messages.map(m=>m.senderId!==STATE.currentUser.uid?{...m,read:true}:m);updateDoc(doc(db,'conversations',key),{messages:updated}).catch(()=>{});}
 
-  // Mark incoming messages as read in Firestore
-  const hasUnread = messages.some(m => m.senderId !== STATE.currentUser.uid && !m.read);
-  if (hasUnread) {
-    const updated = messages.map(m =>
-      m.senderId !== STATE.currentUser.uid ? { ...m, read: true } : m
-    );
-    updateDoc(doc(db, 'conversations', key), { messages: updated }).catch(() => {});
-  }
-
-  const root = div({ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)' });
+  const root=document.createElement('div');root.style.cssText='display:flex;flex-direction:column;height:calc(100vh - 120px);background:#f0ebe3;';
 
   // Header
-  const hd = div({ padding: '12px 16px', borderBottom: '1px solid #ede8e0', display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 });
-  hd.appendChild(btn({ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#a09890', padding: '0', lineHeight: 1 }, '←', () => {
-    if (unsubConv) { unsubConv(); unsubConv = null; }
-    setState({ msgActive: null });
-  }));
-  hd.appendChild(Avatar(u, 34));
-  const hInfo = div({ flex: 1, minWidth: '0' });
-  const msgNameRow=div({display:'flex',alignItems:'center',gap:'6px'});
-  msgNameRow.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: 600, color: '#2a2420' } }, u.displayName || ''));
-  const mgb=GradeBadge(u,true); if(mgb) msgNameRow.appendChild(mgb);
-  hInfo.appendChild(msgNameRow);
-  hInfo.appendChild(el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '11px', color: '#a09890' } }, '@' + (u.handle || '')));
-  hd.appendChild(hInfo);
-  root.appendChild(hd);
+  const hd=document.createElement('div');hd.style.cssText='background:#fff;padding:12px 16px;border-bottom:1px solid #f5f2ee;display:flex;gap:12px;align-items:center;flex-shrink:0;';
+  const back=document.createElement('button');back.type='button';back.textContent='←';back.style.cssText='background:none;border:none;cursor:pointer;font-size:20px;color:#7a7068;padding:0 4px;';
+  back.onclick=()=>{if(unsubConv){unsubConv();unsubConv=null;}setState({msgActive:null});};
+  hd.appendChild(back);hd.appendChild(Avatar(u,38));
+  const hInfo=document.createElement('div');hInfo.style.flex='1';hInfo.style.minWidth='0';
+  const hn=document.createElement('div');hn.style.cssText='font-size:15px;font-weight:700;color:#1a1a1a;';hn.textContent=u.displayName||'';
+  const hs=document.createElement('div');hs.style.cssText='font-size:12px;color:#a09890;';hs.textContent='@'+(u.handle||'')+(u.isOnline?' · En ligne':'');
+  hInfo.appendChild(hn);hInfo.appendChild(hs);hd.appendChild(hInfo);
 
-  // Messages
-  const msgsDiv = el('div', { id: 'conv-messages', style: { flex: 1, padding: '14px 16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' } });
+  // Action icons
+  const acts=document.createElement('div');acts.style.cssText='display:flex;gap:4px;';
+  ['📞','📹','ℹ'].forEach(ic=>{const b=document.createElement('button');b.type='button';b.textContent=ic;b.style.cssText='background:none;border:none;cursor:pointer;font-size:18px;color:#a09890;padding:6px;border-radius:8px;';acts.appendChild(b);});
+  hd.appendChild(acts);root.appendChild(hd);
 
-  if (!messages.length) {
-    const empty = div({ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '8px' });
-    empty.appendChild(el('div', { style: { fontSize: '28px', opacity: '0.3' } }, '◇'));
-    empty.appendChild(p({ fontFamily: "'Lora',serif", fontSize: '13px', color: '#c5bfb8', fontStyle: 'italic' }, 'Commencez la conversation'));
-    msgsDiv.appendChild(empty);
-  } else {
-    messages.forEach((m, idx) => {
-      const isMe = m.senderId === STATE.currentUser.uid;
-      const mb = div({ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '6px' });
-      const bubble = div({
-        maxWidth: '72%', padding: '9px 13px',
-        borderRadius: isMe ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
-        background: isMe ? '#2a2420' : '#f0ebe4',
-        fontFamily: "'Lora',serif", fontSize: '14px', lineHeight: 1.6,
-        color: isMe ? '#f5f0ea' : '#3a3430'
-      }, [m.text]);
-
-      // Time
-      const ts = m.ts ? new Date(m.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-      const timeEl = el('div', { style: { fontFamily: "'DM Sans',sans-serif", fontSize: '9px', color: isMe ? 'rgba(245,240,234,0.5)' : '#c5bfb8', marginTop: '3px', textAlign: isMe ? 'right' : 'left' } }, ts);
-
-      const bubbleWrap = div({ maxWidth: '72%' }, [bubble, timeEl]);
-
-      if (isMe) {
-        const delBtn = btn({ background: 'none', border: 'none', cursor: 'pointer', color: '#c5bfb8', fontSize: '11px', padding: '0 4px', alignSelf: 'center', flexShrink: 0, opacity: '0', transition: 'opacity 0.2s' }, '✕', async () => {
-          const updated = messages.filter((_, i) => i !== idx);
-          try { await updateDoc(doc(db, 'conversations', key), { messages: updated }); } catch(e) { console.error(e); }
-        });
-        mb.appendChild(delBtn);
-        mb.appendChild(bubbleWrap);
-        mb.onmouseenter = () => delBtn.style.opacity = '1';
-        mb.onmouseleave = () => delBtn.style.opacity = '0';
-        let pressTimer;
-        bubble.addEventListener('touchstart', () => { pressTimer = setTimeout(() => delBtn.style.opacity = '1', 600); });
-        bubble.addEventListener('touchend', () => clearTimeout(pressTimer));
-      } else {
-        mb.appendChild(bubbleWrap);
-      }
-      msgsDiv.appendChild(mb);
-    });
-  }
+  // Messages area
+  const msgsDiv=document.createElement('div');msgsDiv.id='conv-messages';
+  msgsDiv.style.cssText='flex:1;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;background:#f0ebe3;';
+  updateMessagesList(msgsDiv,uid);
   root.appendChild(msgsDiv);
-  setTimeout(() => msgsDiv.scrollTop = msgsDiv.scrollHeight, 30);
 
-  // Input
-  const inp = div({ padding: '10px 16px', borderTop: '1px solid #ede8e0', display: 'flex', gap: '8px', flexShrink: 0 });
-  const ti = el('input', { type: 'text', placeholder: 'Envoyer un message...', id:'msg-input', name:'message', style: { flex: 1, border: 'none', borderBottom: '1px solid #d5cfc8', outline: 'none', padding: '6px 0', fontFamily: "'Lora',serif", fontSize: '14px', color: '#2a2420', background: 'transparent' } });
-  ti.value = STATE.msgInput || '';
-  ti.addEventListener('input', e => { STATE.msgInput = e.target.value; });
-  ti.addEventListener('focus', () => { ti.value = STATE.msgInput || ''; });
-  const send = async () => {
-    const txt = (STATE.msgInput || ti.value || '').trim();
-    if (!txt) return;
-    STATE.msgInput = '';
-    ti.value = '';
-    const newMsg = { senderId: STATE.currentUser.uid, text: txt, ts: Date.now(), read: false };
-    const convRef = doc(db, 'conversations', key);
-    try {
-      const snap = await getDoc(convRef);
-      if (snap.exists()) {
-        await updateDoc(convRef, { messages: arrayUnion(newMsg), updatedAt: serverTimestamp() });
-      } else {
-        await setDoc(convRef, { participants: [STATE.currentUser.uid, uid], messages: [newMsg], updatedAt: serverTimestamp() });
-      }
-    } catch(e) { console.error(e); toast('Erreur envoi', true); }
+  // Input area
+  const inp=document.createElement('div');inp.style.cssText='background:#fff;padding:12px 16px;border-top:1px solid #f5f2ee;display:flex;gap:10px;align-items:center;flex-shrink:0;';
+
+  // Emoji / attach buttons
+  const emojiBtn=document.createElement('button');emojiBtn.type='button';emojiBtn.textContent='😊';emojiBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:20px;color:#a09890;padding:4px;';
+  const attachBtn=document.createElement('button');attachBtn.type='button';attachBtn.textContent='📎';attachBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:20px;color:#a09890;padding:4px;';
+  inp.appendChild(emojiBtn);inp.appendChild(attachBtn);
+
+  const ti=document.createElement('input');ti.type='text';ti.id='msg-input';ti.name='message';ti.placeholder='Écrire un message...';
+  ti.style.cssText='flex:1;background:#f5f2ee;border:none;border-radius:22px;padding:11px 18px;font-size:14px;color:#1a1a1a;outline:none;';
+  ti.value=STATE.msgInput||'';
+  ti.addEventListener('input',e=>{STATE.msgInput=e.target.value;});
+  ti.addEventListener('focus',()=>{ti.value=STATE.msgInput||'';});
+
+  const send=async()=>{
+    const txt=(STATE.msgInput||ti.value||'').trim();if(!txt)return;
+    ti.value='';STATE.msgInput='';
+    const newMsg={senderId:STATE.currentUser.uid,text:txt,ts:Date.now(),read:false};
+    const convRef=doc(db,'conversations',key);
+    try{
+      const snap=await getDoc(convRef);
+      if(snap.exists())await updateDoc(convRef,{messages:arrayUnion(newMsg),updatedAt:serverTimestamp()});
+      else await setDoc(convRef,{participants:[STATE.currentUser.uid,uid],messages:[newMsg],updatedAt:serverTimestamp()});
+    }catch(e){console.error(e);toast('Erreur envoi',true);}
   };
-  ti.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
-  inp.appendChild(ti);
-  const sendBtn = document.createElement('button');
-  sendBtn.type = 'button'; sendBtn.textContent = '↑';
-  sendBtn.style.cssText = 'background:#2a2420;color:#f5f0ea;border:none;width:32px;height:32px;border-radius:50%;font-size:14px;cursor:pointer;flex-shrink:0;';
-  sendBtn.onclick = send;
-  inp.appendChild(sendBtn);
-  root.appendChild(inp);
+  ti.addEventListener('keydown',e=>{if(e.key==='Enter')send();});
 
+  const sendBtn=document.createElement('button');sendBtn.type='button';sendBtn.textContent='↑';
+  sendBtn.style.cssText='background:#1a1a1a;color:#fff;border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0;';
+  sendBtn.onclick=send;
+  inp.appendChild(ti);inp.appendChild(sendBtn);root.appendChild(inp);
+  setTimeout(()=>msgsDiv.scrollTop=msgsDiv.scrollHeight,30);
   return root;
-}
-
-// ══════════════════════════════════════════════════════════════════
-// MAIN APP SHELL
-// ══════════════════════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════════════════════
-// ADMIN PANEL
-// ══════════════════════════════════════════════════════════════════
-// ── Admin action handler (event delegation) ──────────────────────
-function handleAdminAction(action, data){
-  lockRender(800);
-  const BG='#faf7f3',CARD='#f5f0ea',BDR='#ede8e0',TXT='#2a2420',
-        MUTED='#a09890',ACCENT='#c17a4a',DANGER='#c0392b',GOLD='#b8860b';
-  switch(action){
-    case 'tab':
-      STATE.adminSection = data.id;
-      refreshAdmin();
-      break;
-    case 'confirm-delete':
-      STATE.adminConfirm = {type: data.type, id: data.id, uid: data.uid, name: data.name};
-      refreshAdmin();
-      break;
-    case 'cancel-confirm':
-      STATE.adminConfirm = null;
-      refreshAdmin();
-      break;
-    case 'do-delete':
-      (async()=>{
-        if(STATE.adminConfirm?.type==='post'){
-          try{ await deleteDoc(doc(db,'posts',STATE.adminConfirm.id)); }catch(e){toast('Erreur',true);}
-        } else if(STATE.adminConfirm?.type==='user'){
-          try{
-            const ups=STATE.posts.filter(p=>p.userId===STATE.adminConfirm.uid);
-            await Promise.all(ups.map(p=>deleteDoc(doc(db,'posts',p.id))));
-            await deleteDoc(doc(db,'users',STATE.adminConfirm.uid));
-            delete STATE.users[STATE.adminConfirm.uid];
-          }catch(e){toast('Erreur',true);}
-        }
-        STATE.adminConfirm=null;
-        refreshAdmin();
-      })();
-      break;
-    case 'set-role':
-      (async()=>{
-        const upd={isAdmin:data.role==='admin'||data.role==='superAdmin',isSuperAdmin:data.role==='superAdmin'};
-        try{
-          await updateDoc(doc(db,'users',data.uid),upd);
-          STATE.users[data.uid]={...STATE.users[data.uid],...upd};
-          toast('Rôle mis à jour');
-        }catch(e){toast('Erreur : '+e.message,true);}
-        refreshAdmin();
-      })();
-      break;
-    case 'set-grade':
-      (async()=>{
-        const newGrade=data.grade==='none'?null:data.grade;
-        try{
-          await updateDoc(doc(db,'users',data.uid),{grade:newGrade});
-          STATE.users[data.uid]={...STATE.users[data.uid],grade:newGrade};
-          toast('Grade mis à jour');
-        }catch(e){toast('Erreur : '+e.message,true);}
-        refreshAdmin();
-      })();
-      break;
-    case 'promote-admin':
-      (async()=>{
-        try{await updateDoc(doc(db,'users',data.uid),{isAdmin:true});}catch(e){toast('Erreur',true);}
-        STATE.users[data.uid]={...STATE.users[data.uid],isAdmin:true};
-        toast('Promu Admin');
-        refreshAdmin();
-      })();
-      break;
-    case 'degrade-admin':
-      (async()=>{
-        try{await updateDoc(doc(db,'users',data.uid),{isAdmin:false});}catch(e){toast('Erreur',true);}
-        STATE.users[data.uid]={...STATE.users[data.uid],isAdmin:false};
-        toast('Rétrogradé');
-        refreshAdmin();
-      })();
-      break;
-    case 'toggle-maintenance':
-      (async()=>{
-        const newVal=!STATE.maintenance;
-        try{
-          await setDoc(doc(db,'config','maintenance'),{enabled:newVal,updatedAt:serverTimestamp()});
-          STATE.maintenance=newVal;
-          toast(newVal?'Maintenance activée':'Maintenance désactivée');
-        }catch(e){toast('Erreur : '+e.message,true);}
-        refreshAdmin();
-      })();
-      break;
-  }
-}
-
-// Refresh only the admin content area (not the full page)
-function refreshAdmin(){
-  const container = document.getElementById('admin-root');
-  if(!container){ render(); return; }
-  container.innerHTML='';
-  buildAdminContent(container);
 }
 
 function renderAdmin(){
