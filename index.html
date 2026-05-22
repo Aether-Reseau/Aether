@@ -767,6 +767,17 @@ function renderFeed(){
   return root;
 }
 
+// ── Video helpers ─────────────────────────────────────────────────
+function getVideoFeed(){
+  const q=(STATE.videoSearch||'').toLowerCase().trim();
+  return STATE.posts.filter(p=>{
+    if(p.media?.type!=='video') return false;
+    if(!q) return true;
+    const u=getUserCached(p.userId)||{};
+    return (p.content||'').toLowerCase().includes(q)||(u.handle||'').toLowerCase().includes(q)||(u.displayName||'').toLowerCase().includes(q);
+  });
+}
+
 function renderVideos(){
   const allVids = getVideoFeed();
   const curIdx = STATE.videoIndex||0;
@@ -1432,6 +1443,87 @@ function buildExploreList(list,me,allUsers,q){
     };
     row.appendChild(fb);list.appendChild(row);
   });
+}
+
+// ── Messaging helpers ─────────────────────────────────────────────
+function convKey(uid1, uid2) {
+  return [uid1, uid2].sort().join('_');
+}
+
+function getMutualFollows() {
+  const me = STATE.userProfile || {};
+  const myFollowing = me.followingIds || [];
+  const iAmAdmin = me.isAdmin || me.isSuperAdmin;
+  return Object.values(STATE.users).filter(u => {
+    if (u.uid === STATE.currentUser?.uid) return false;
+    if (!u.handle) return false;
+    const theyFollowMe = (u.followingIds || []).includes(STATE.currentUser?.uid);
+    const iFollowThem = myFollowing.includes(u.uid);
+    if (iAmAdmin) return iFollowThem || theyFollowMe;
+    if (u.isAdmin || u.isSuperAdmin) return iFollowThem && theyFollowMe;
+    return theyFollowMe && iFollowThem;
+  });
+}
+
+function subscribeToConv(uid) {
+  if (unsubConv) { unsubConv(); unsubConv = null; }
+  const key = convKey(STATE.currentUser.uid, uid);
+  const convRef = doc(db, 'conversations', key);
+  unsubConv = onSnapshot(convRef, snap => {
+    if (snap.exists()) {
+      STATE.msgConvs[key] = snap.data();
+    } else {
+      STATE.msgConvs[key] = { messages: [] };
+    }
+    const msgsList = document.getElementById('conv-messages');
+    if (msgsList) updateMessagesList(msgsList, uid);
+  });
+}
+
+function getConvMessages(uid) {
+  const key = convKey(STATE.currentUser.uid, uid);
+  return (STATE.msgConvs[key] || { messages: [] }).messages || [];
+}
+
+function updateMessagesList(container, uid) {
+  const messages = getConvMessages(uid);
+  const key = convKey(STATE.currentUser.uid, uid);
+  container.innerHTML = '';
+  if (!messages.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:10px;padding:40px 0;';
+    const ic=document.createElement('div');ic.textContent='✉';ic.style.cssText='font-size:32px;opacity:0.25;';
+    const tx=document.createElement('p');tx.textContent='Commencez la conversation';tx.style.cssText="font-family:'Lora',serif;font-size:14px;color:#b0a898;font-style:italic;";
+    empty.appendChild(ic);empty.appendChild(tx);container.appendChild(empty);return;
+  }
+  messages.forEach((m, idx) => {
+    const isMe = m.senderId === STATE.currentUser.uid;
+    const mb = document.createElement('div');
+    mb.style.cssText = 'display:flex;justify-content:'+(isMe?'flex-end':'flex-start')+';align-items:flex-end;gap:6px;';
+    const ts = m.ts ? new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
+    const bw = document.createElement('div'); bw.style.maxWidth='72%';
+    const bubble = document.createElement('div');
+    bubble.style.cssText = 'padding:10px 14px;border-radius:'+(isMe?'18px 18px 4px 18px':'18px 18px 18px 4px')+';background:'+(isMe?'#1a1a1a':'#fff')+';font-size:14px;line-height:1.6;color:'+(isMe?'#fff':'#1a1a1a')+';box-shadow:0 1px 4px rgba(0,0,0,0.06);';
+    bubble.textContent = m.text;
+    const timeEl = document.createElement('div');
+    timeEl.style.cssText = 'font-size:10px;color:'+(isMe?'rgba(255,255,255,0.5)':'#b0a898')+';margin-top:3px;text-align:'+(isMe?'right':'left')+';padding:0 2px;';
+    timeEl.textContent = ts;
+    bw.appendChild(bubble); bw.appendChild(timeEl);
+    if (isMe) {
+      const delBtn = document.createElement('button'); delBtn.type='button'; delBtn.textContent='✕';
+      delBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:#c5bfb8;font-size:10px;padding:0 4px;align-self:center;flex-shrink:0;opacity:0;transition:opacity 0.2s;';
+      delBtn.onclick = async () => {
+        const updated = messages.filter((_,i) => i !== idx);
+        try { await updateDoc(doc(db,'conversations',key),{messages:updated}); } catch(e){console.error(e);}
+      };
+      mb.appendChild(delBtn); mb.appendChild(bw);
+      mb.onmouseenter=()=>delBtn.style.opacity='1'; mb.onmouseleave=()=>delBtn.style.opacity='0';
+    } else {
+      mb.appendChild(bw);
+    }
+    container.appendChild(mb);
+  });
+  container.scrollTop = container.scrollHeight;
 }
 
 function renderMessages() {
