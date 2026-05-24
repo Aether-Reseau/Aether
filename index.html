@@ -2068,6 +2068,89 @@ function renderConversation(uid) {
   return root;
 }
 
+// ── Admin action handler (event delegation) ──────────────────────
+function handleAdminAction(action, data){
+  lockRender(800);
+  switch(action){
+    case 'tab':
+      STATE.adminSection = data.id;
+      refreshAdmin();
+      break;
+    case 'confirm-delete':
+      STATE.adminConfirm = {type:data.type, id:data.id, uid:data.uid, name:data.name};
+      refreshAdmin();
+      break;
+    case 'cancel-confirm':
+      STATE.adminConfirm = null;
+      refreshAdmin();
+      break;
+    case 'do-delete':
+      (async()=>{
+        if(STATE.adminConfirm?.type==='post'){
+          try{await deleteDoc(doc(db,'posts',STATE.adminConfirm.id));}catch(e){toast('Erreur',true);}
+        } else if(STATE.adminConfirm?.type==='user'){
+          try{
+            const ups=STATE.posts.filter(p=>p.userId===STATE.adminConfirm.uid);
+            await Promise.all(ups.map(p=>deleteDoc(doc(db,'posts',p.id))));
+            await deleteDoc(doc(db,'users',STATE.adminConfirm.uid));
+            delete STATE.users[STATE.adminConfirm.uid];
+          }catch(e){toast('Erreur',true);}
+        }
+        STATE.adminConfirm=null;
+        refreshAdmin();
+      })();
+      break;
+    case 'set-role':
+      (async()=>{
+        const upd={isAdmin:data.role==='admin'||data.role==='superAdmin',isSuperAdmin:data.role==='superAdmin'};
+        try{await updateDoc(doc(db,'users',data.uid),upd);STATE.users[data.uid]={...STATE.users[data.uid],...upd};toast('Rôle mis à jour');}
+        catch(e){toast('Erreur : '+e.message,true);}
+        refreshAdmin();
+      })();
+      break;
+    case 'set-grade':
+      (async()=>{
+        const newGrade=data.grade==='none'?null:data.grade;
+        try{await updateDoc(doc(db,'users',data.uid),{grade:newGrade});STATE.users[data.uid]={...STATE.users[data.uid],grade:newGrade};toast('Grade mis à jour');}
+        catch(e){toast('Erreur : '+e.message,true);}
+        refreshAdmin();
+      })();
+      break;
+    case 'promote-admin':
+      (async()=>{
+        try{await updateDoc(doc(db,'users',data.uid),{isAdmin:true});}catch(e){toast('Erreur',true);}
+        STATE.users[data.uid]={...STATE.users[data.uid],isAdmin:true};toast('Promu Admin');
+        refreshAdmin();
+      })();
+      break;
+    case 'degrade-admin':
+      (async()=>{
+        try{await updateDoc(doc(db,'users',data.uid),{isAdmin:false});}catch(e){toast('Erreur',true);}
+        STATE.users[data.uid]={...STATE.users[data.uid],isAdmin:false};toast('Rétrogradé');
+        refreshAdmin();
+      })();
+      break;
+    case 'toggle-maintenance':
+      (async()=>{
+        const newVal=!STATE.maintenance;
+        try{
+          await setDoc(doc(db,'config','maintenance'),{enabled:newVal,updatedAt:serverTimestamp()});
+          STATE.maintenance=newVal;
+          toast(newVal?'Maintenance activée':'Maintenance désactivée');
+        }catch(e){toast('Erreur : '+e.message,true);}
+        refreshAdmin();
+      })();
+      break;
+  }
+}
+
+function refreshAdmin(){
+  const container = document.getElementById('admin-root');
+  if(!container){render();return;}
+  container.innerHTML='';
+  buildAdminContent(container);
+}
+
 function renderAdmin(){
   const root = document.createElement('div');
   root.id = 'admin-root';
