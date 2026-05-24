@@ -2511,7 +2511,7 @@ function renderDesktop(){
     nb.className = 'ae-nav-item' + (active?' active':'');
 
     const svgEl = makeSVGIcon(svgIcons[item.id]||svgIcons.feed, active?'var(--text-primary)':'var(--text-secondary)');
-    svgEl.className = 'ae-nav-icon';
+    svgEl.setAttribute('class','ae-nav-icon');
 
     const lblS = document.createElement('span');
     lblS.textContent = item.label;
@@ -2768,7 +2768,7 @@ function makeSVGIcon(pathD, stroke='currentColor', size=20){
   svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');
   svg.setAttribute('stroke',stroke);svg.setAttribute('stroke-width','1.75');
   svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');
-  svg.style.flexShrink='0';svg.style.pointerEvents='none';
+  svg.style.cssText='flex-shrink:0;pointer-events:none;';
   const p=document.createElementNS(ns,'path');p.setAttribute('d',pathD);svg.appendChild(p);
   return svg;
 }
