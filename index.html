@@ -770,26 +770,50 @@ let unsubPosts = null;
 let unsubConv = null; // Active conversation listener
 let unsubProfile = null; // Own profile real-time listener
 
+// ── FCM Notifications ─────────────────────────────────────────────
+let messaging = null;
+try { messaging = getMessaging(app); } catch(e) {}
+
+async function requestNotificationPermission() {
+  if (!messaging || !('Notification' in window)) return;
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+    const token = await getToken(messaging, {
+      vapidKey: '9azFIDePXBG3V3kUVq-OmntSsXJEV8jqLWRrnVTIFgw'
+    });
+    if (token && STATE.currentUser) {
+      await updateDoc(doc(db,'users',STATE.currentUser.uid),{fcmTokens:arrayUnion(token)});
+    }
+  } catch(e) { console.warn('FCM:', e); }
+}
+
+function setupFCMListener() {
+  if (!messaging) return;
+  onMessage(messaging, (payload) => {
+    const { title, body } = payload.notification || {};
+    if (title) { toast('💬 ' + (body || title)); render(); }
+  });
+}
+
+async function checkPendingNotifications(uid) {
+  try {
+    const snap = await getDoc(doc(db,'notifications',uid));
+    if (!snap.exists()) return;
+    const msgs = snap.data().unreadMessages || [];
+    if (!msgs.length) return;
+    const latest = msgs[msgs.length-1];
+    if (Date.now() - latest.ts < 300000)
+      toast('💬 Message de @'+(latest.fromHandle||latest.fromName));
+    await updateDoc(doc(db,'notifications',uid),{unreadMessages:[]});
+  } catch(e) {}
+}
+
 // ── Device detection ─────────────────────────────────────────────
 function isDesktop(){ return window.innerWidth >= 768; }
 
 // ── Check pending notifications ───────────────────────────────────
-async function checkPendingNotifications(uid) {
-  try {
-    const notifSnap = await getDoc(doc(db,'notifications',uid));
-    if (!notifSnap.exists()) return;
-    const data = notifSnap.data();
-    const msgs = data.unreadMessages || [];
-    if (msgs.length === 0) return;
-    // Show toast for latest message
-    const latest = msgs[msgs.length - 1];
-    if (Date.now() - latest.ts < 300000) { // within 5 minutes
-      toast('💬 Message de @' + (latest.fromHandle || latest.fromName));
-    }
-    // Clear notifications after reading
-    await updateDoc(doc(db,'notifications',uid), { unreadMessages: [] });
-  } catch(e) { /* notifications not set up yet */ }
-}
+
 
 // Global render lock - prevents DOM rebuild during click handlers
 let _renderLocked = false;
