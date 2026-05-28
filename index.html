@@ -223,6 +223,8 @@ h1,h2,h3 { font-family: 'Lora', serif; font-weight: 500; letter-spacing: -0.02em
   line-height: 1.55;
   max-width: 72%;
   word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
   box-shadow: var(--shadow-sm);
 }
 .ae-bubble-them {
@@ -234,6 +236,8 @@ h1,h2,h3 { font-family: 'Lora', serif; font-weight: 500; letter-spacing: -0.02em
   line-height: 1.55;
   max-width: 72%;
   word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
 }
@@ -810,7 +814,13 @@ async function checkPendingNotifications(uid) {
 }
 
 // ── Device detection ─────────────────────────────────────────────
-function isDesktop(){ return window.innerWidth >= 768; }
+function isDesktop(){
+  // Only use desktop layout for actual desktop/tablet with mouse
+  // Phones in landscape orientation should stay mobile
+  const hasMousePointer = window.matchMedia('(pointer:fine)').matches;
+  const isWide = window.innerWidth >= 768;
+  return isWide && hasMousePointer;
+}
 
 // ── Check pending notifications ───────────────────────────────────
 
@@ -1192,13 +1202,32 @@ function renderFeed(){
 
     // Media
     if(post.media?.url){
-      const mw=document.createElement('div');mw.style.cssText='border-radius:12px;overflow:hidden;margin-bottom:14px;background:#f0ebe4;';
+      const mw=document.createElement('div');mw.style.cssText='border-radius:12px;overflow:hidden;margin-bottom:14px;background:var(--surface-3);';
       if(post.media.type==='image'){
         const img=document.createElement('img');img.src=post.media.url;img.loading='lazy';
         img.style.cssText='width:100%;max-height:560px;object-fit:contain;display:block;';mw.appendChild(img);
       }else{
-        const vid=document.createElement('video');vid.src=post.media.url;vid.controls=true;vid.playsInline=true;
-        vid.style.cssText='width:100%;max-height:500px;display:block;background:#000;';mw.appendChild(vid);
+        const vid=document.createElement('video');
+        vid.src=post.media.url;vid.playsInline=true;vid.muted=true;vid.loop=true;
+        vid.controls=true;
+        vid.style.cssText='width:100%;max-height:500px;display:block;background:#000;';
+        vid.setAttribute('playsinline','');
+        vid.setAttribute('webkit-playsinline','');
+        // Autoplay when visible, pause when not
+        const observer=new IntersectionObserver((entries)=>{
+          entries.forEach(e=>{
+            if(e.isIntersecting){
+              // Pause all other feed videos first
+              document.querySelectorAll('video.feed-vid').forEach(v=>{if(v!==vid){v.pause();}});
+              vid.play().catch(()=>{});
+            } else {
+              vid.pause();
+            }
+          });
+        },{threshold:0.6});
+        vid.className='feed-vid';
+        observer.observe(vid);
+        mw.appendChild(vid);
       }
       card.appendChild(mw);
     }
@@ -1274,11 +1303,13 @@ function renderVideos(){
   const me = STATE.userProfile||{};
 
   // Container
-  const maxH = isDesktop() ? 'calc(100vh - 57px)' : 'calc(100vh - 120px)';
+  const maxH = isDesktop() ? 'calc(100vh - 57px)' : 'calc(100dvh - 120px)';
   const root = div({
     position:'relative',
-    background: isDesktop() ? 'var(--bg)' : '#111',
-    height: maxH, overflow:'hidden', userSelect:'none',
+    background: isDesktop() ? 'var(--bg)' : '#0a0a0a',
+    height: maxH,
+    minHeight: '400px',
+    overflow:'hidden', userSelect:'none',
     display:'flex', alignItems:'center', justifyContent:'center'
   });
 
@@ -1303,29 +1334,30 @@ function renderVideos(){
   // ── Video container ──
   const vidContainer = div({
     position:'relative',
-    width: isDesktop() ? 'auto' : '100%',
+    width: isDesktop() ? 'min(380px, calc(('+maxH+' - 48px) * 0.5625))' : '100%',
     height: isDesktop() ? '100%' : '100%',
     flexShrink: 0,
     borderRadius: isDesktop() ? '16px' : '0',
     overflow: 'hidden',
-    background: isDesktop() ? '#1a1714' : '#000',
+    background: '#000',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    maxWidth: isDesktop() ? 'min(420px, calc('+maxH+' * 9/16))' : '100%',
-    minWidth: isDesktop() ? '280px' : '100%',
   });
 
   const vid = el('video',{
     src: post.media.url, loop:true, playsInline:true, autoplay:true,
     style:{
-      width: isDesktop() ? 'auto' : '100%',
-      height: isDesktop() ? '100%' : '100%',
+      width: '100%',
+      height: '100%',
       maxWidth: '100%',
       objectFit: isDesktop() ? 'contain' : 'cover',
-      display:'block'
+      display:'block',
+      background:'#000'
     }
   });
+  vid.setAttribute('playsinline','');
+  vid.setAttribute('webkit-playsinline','');
   vid.muted = STATE.videoMuted!==false;
   vidContainer.appendChild(vid);
 
