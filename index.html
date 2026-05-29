@@ -63,7 +63,27 @@ button{-webkit-appearance:none;touch-action:manipulation;}
 /* Base */
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
 html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--text-primary); }
+body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--text-primary); word-break: break-word; overflow-wrap: break-word; }
+
+/* Global text overflow prevention */
+p, span, div, h1, h2, h3, a {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Post content */
+.post-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+/* All cards - prevent overflow */
+.ae-card, .ae-post, .ae-panel-card {
+  overflow: hidden;
+  min-width: 0;
+}
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 3px; height: 3px; }
@@ -1060,7 +1080,7 @@ function renderFeed(){
 
   // ── Compose box ──
   const compose = document.createElement('div');
-  compose.style.cssText = 'background:#fff;border-radius:16px;padding:20px;margin-bottom:12px;';
+  compose.style.cssText = 'background:var(--surface);border-radius:16px;padding:20px;margin-bottom:12px;overflow:hidden;';
 
   const composeTop = document.createElement('div');
   composeTop.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:16px;';
@@ -1169,7 +1189,7 @@ function renderFeed(){
     const showC=STATE.openComments[post.id];
 
     const card=document.createElement('div');
-    card.style.cssText='background:#fff;border-radius:16px;padding:20px;margin-bottom:12px;';
+    card.style.cssText='background:var(--surface);border-radius:16px;padding:20px;margin-bottom:12px;overflow:hidden;min-width:0;';
 
     // Header
     const ph=document.createElement('div');ph.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:14px;';
@@ -1264,7 +1284,7 @@ function renderFeed(){
         cd.appendChild(Avatar(cu,30));
         const cb=document.createElement('div');cb.style.cssText='background:#f5f2ee;border-radius:12px;padding:8px 12px;flex:1;';
         const cn=document.createElement('span');cn.style.cssText='font-size:12px;font-weight:700;color:#1a1a1a;';cn.textContent=(cu.handle?'@'+cu.handle:cu.displayName||'?')+' ';
-        const ct=document.createElement('span');ct.style.cssText="font-family:'Lora',serif;font-size:13px;color:#3a3430;";ct.textContent=c.text;
+        const ct=document.createElement('span');ct.style.cssText="font-family:'Lora',serif;font-size:13px;color:var(--text-secondary);word-break:break-word;overflow-wrap:break-word;";ct.textContent=c.text;
         cb.appendChild(cn);cb.appendChild(ct);cd.appendChild(cb);cSec.appendChild(cd);
       });
       const ci=document.createElement('div');ci.style.cssText='display:flex;gap:10px;align-items:center;';
@@ -1755,7 +1775,7 @@ function renderProfile(userProf, isMe, onBack){
   card.appendChild(nameRow);
 
   // Bio
-  if(userProf.bio){const bio=document.createElement('p');bio.style.cssText="font-family:'Lora',serif;font-size:14px;color:#3a3430;line-height:1.6;margin:0 0 12px;";bio.textContent=userProf.bio;card.appendChild(bio);}
+  if(userProf.bio){const bio=document.createElement('p');bio.style.cssText="font-family:'Lora',serif;font-size:14px;color:var(--text-secondary);line-height:1.6;margin:0 0 12px;word-break:break-word;overflow-wrap:break-word;";bio.textContent=userProf.bio;card.appendChild(bio);}
 
   // Location, website, join date
   const metaRow=document.createElement('div');metaRow.style.cssText='display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;';
@@ -1795,7 +1815,7 @@ function renderProfile(userProf, isMe, onBack){
     } else {
       userPosts.forEach(post=>{
         const card2=document.createElement('div');card2.style.cssText='background:#fff;border-radius:16px;padding:16px;margin:0 0 12px;';
-        if(post.content){const pc=document.createElement('p');pc.style.cssText="font-family:'Lora',serif;font-size:14px;color:#2a2420;line-height:1.6;margin:0 0 10px;";pc.textContent=post.content;card2.appendChild(pc);}
+        if(post.content){const pc=document.createElement('p');pc.style.cssText="font-family:'Lora',serif;font-size:14px;color:var(--text-primary);line-height:1.6;margin:0 0 10px;word-break:break-word;overflow-wrap:break-word;max-width:100%;";pc.textContent=post.content;card2.appendChild(pc);}
         if(post.media?.url){
           const mw=document.createElement('div');mw.style.cssText='border-radius:10px;overflow:hidden;background:#f0ebe4;';
           if(post.media.type==='image'){const img=document.createElement('img');img.src=post.media.url;img.style.cssText='width:100%;max-height:400px;object-fit:contain;display:block;';mw.appendChild(img);}
@@ -1956,7 +1976,7 @@ function buildExploreList(list,me,allUsers,q){
     const ns=document.createElement('span');ns.style.cssText='font-size:14px;font-weight:600;color:#1a1a1a;';ns.textContent=u.displayName||'';
     nh.appendChild(ns);const egb=GradeBadge(u,true);if(egb)nh.appendChild(egb);
     const hs=document.createElement('div');hs.style.cssText='font-size:12px;color:#a09890;';hs.textContent='@'+(u.handle||'')+' · '+(u.followers||0)+' abonnés';
-    if(u.bio){const bs=document.createElement('div');bs.style.cssText="font-size:12px;color:#7a7068;margin-top:2px;font-family:'Lora',serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";bs.textContent=u.bio;info.appendChild(nh);info.appendChild(hs);info.appendChild(bs);}
+    if(u.bio){const bs=document.createElement('div');bs.style.cssText="font-size:12px;color:var(--text-secondary);margin-top:2px;font-family:'Lora',serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;";bs.textContent=u.bio;info.appendChild(nh);info.appendChild(hs);info.appendChild(bs);}
     else{info.appendChild(nh);info.appendChild(hs);}
     row.appendChild(info);
     const fb=document.createElement('button');fb.type='button';fb.textContent=followed?'Abonné':'Suivre';
