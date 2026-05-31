@@ -3157,13 +3157,19 @@ function render(){
       return;
     }
     if(!STATE.currentUser){
-      document.body.style.background='#f5f0ea';
-      root.appendChild(renderAuth());
+      // If still checking auth, show splash instead of login screen
+      if(STATE.showSplash){
+        document.body.style.background='var(--bg)';
+        root.appendChild(renderSplash());
+      } else {
+        document.body.style.background='var(--bg)';
+        root.appendChild(renderAuth());
+      }
     } else if(isDesktop()){
-      document.body.style.background='#ede8e0';
+      document.body.style.background='var(--bg)';
       root.appendChild(renderDesktop());
     } else {
-      document.body.style.background='#f5f0ea';
+      document.body.style.background='var(--bg)';
       root.appendChild(renderApp());
     }
   }catch(err){
@@ -3241,14 +3247,14 @@ onAuthStateChanged(auth, async user=>{
     STATE.userProfile=null;
     STATE.posts=[];
     STATE.postsLoading=true;
-    STATE.showSplash=false;
+    STATE.showSplash=false; // Auth confirmed: no user → show login
     if(unsubPosts){unsubPosts();unsubPosts=null;}
     if(unsubProfile){unsubProfile();unsubProfile=null;}
     render();
   }
 });
 
-// Initial render (shows loading state)
+// Initial render — shows splash while Firebase checks auth
 render();
 
 // Re-render only when WIDTH changes (desktop<->mobile switch)
